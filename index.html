@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>像素农场</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-container">
+    <header>
+      <h1>🌾 像素农场 🌾</h1>
+      <div id="header-right">
+        <div id="coins">💰 <span id="coin-amount">100</span></div>
+        <button id="music-btn" title="背景音乐">🎵</button>
+      </div>
+    </header>
+
+    <div id="main-area">
+      <div id="farm-section">
+        <div id="farm-grid"></div>
+        <div id="toolbar">
+          <button class="tool-btn active" data-tool="plant" title="种植">🌱</button>
+          <button class="tool-btn" data-tool="water" title="浇水">💧</button>
+          <button class="tool-btn" data-tool="harvest" title="收获">🧺</button>
+        </div>
+      </div>
+
+      <div id="side-panel">
+        <div id="tab-bar">
+          <button class="tab-btn active" data-tab="seeds">种子</button>
+          <button class="tab-btn" data-tab="shop">商店</button>
+          <button class="tab-btn" data-tab="inventory">背包</button>
+        </div>
+
+        <div id="tab-content">
+          <div id="seeds-panel" class="tab-panel active"></div>
+          <div id="shop-panel" class="tab-panel"></div>
+          <div id="inventory-panel" class="tab-panel"></div>
+        </div>
+
+        <div id="status-bar">
+          <div id="status-text">欢迎来到像素农场！选择种子开始种植吧~</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="notification"></div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
