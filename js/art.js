@@ -1,10 +1,11 @@
 (function (root) {
   'use strict';
   const D = root.ForestData, W = root.ForestWorld;
+  let latestView = null;
   function create(canvas) {
     const ctx = canvas.getContext('2d');
     const sprites = root.ForestSprites.create(ctx);
-    let lastPlayer = null, strideUntil = 0;
+    let lastPlayer = null, strideUntil = 0, visual = null, motion = null, previousTime = 0;
     let view = { x: 0, y: 0, tile: 40, width: 800, height: 560 };
     const rect = (x, y, w, h, color) => { ctx.fillStyle = color; ctx.fillRect(Math.round(x), Math.round(y), Math.ceil(w), Math.ceil(h)); };
     function draw(s, time) {
@@ -12,11 +13,25 @@
       if (canvas.width !== Math.round(width * ratio) || canvas.height !== Math.round(height * ratio)) { canvas.width = Math.round(width * ratio); canvas.height = Math.round(height * ratio); }
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0); ctx.imageSmoothingEnabled = false;
       const T = width < 500 ? 34 : 42, p = s.player, map = W.maps[p.map];
-      if (lastPlayer && (p.x !== lastPlayer.x || p.y !== lastPlayer.y)) strideUntil = time + 160;
-      lastPlayer = { x: p.x, y: p.y };
+      const changedMap = !lastPlayer || p.map !== lastPlayer.map;
+      if (changedMap || s.settings.reducedMotion) { visual = { x: p.x, y: p.y }; motion = null; }
+      else if (p.x !== lastPlayer.x || p.y !== lastPlayer.y) {
+        motion = { x: visual.x, y: visual.y, start: time }; strideUntil = time + 150;
+      }
+      if (motion) {
+        const progress = Math.min(1, (time - motion.start) / 150);
+        visual = { x: motion.x + (p.x - motion.x) * progress, y: motion.y + (p.y - motion.y) * progress };
+        if (progress === 1) motion = null;
+      }
+      lastPlayer = { x: p.x, y: p.y, map: p.map };
       const phase = s.world.elapsed % D.dayLength / D.dayLength;
       const darkness = phase < .55 ? 0 : phase < .75 ? (phase - .55) * 1.7 : .34;
-      view = { x: Math.max(0, Math.min(W.W * T - width, p.x * T - width / 2)), y: Math.max(0, Math.min(W.H * T - height, p.y * T - height / 2)), tile: T, width, height };
+      const aimX = Math.max(0, Math.min(W.W * T - width, visual.x * T - width / 2));
+      const aimY = Math.max(0, Math.min(W.H * T - height, visual.y * T - height / 2));
+      const snap = changedMap || s.settings.reducedMotion || width !== view.width || height !== view.height;
+      const easing = snap ? 1 : 1 - Math.exp(-Math.min(100, Math.max(0, time - previousTime)) / 55);
+      view = { x: view.x + (aimX - view.x) * easing, y: view.y + (aimY - view.y) * easing, tile: T, width, height };
+      latestView = { ...view, playerX: visual.x, playerY: visual.y }; previousTime = time;
       const px = x => x * T - view.x, py = y => y * T - view.y;
       for (let y = 0; y < W.H; y++) for (let x = 0; x < W.W; x++) {
         const type = map.tiles[y][x], hash = (x * 31 + y * 73) % 17, xx = px(x), yy = py(y);
@@ -33,8 +48,8 @@
         if (type === 'path' && hash < 4) rect(xx + 10, yy + 14, 3, 2, '#c3b58d');
       }
       const target = W.target(s);
-      const drawObjects = map.objects.map(o => ({ ...o, sort: o.y + o.h }));
-      drawObjects.push({ kind: 'player', x: p.x, y: p.y, w: 1, h: 1, sort: p.y + 1.1 });
+      const drawObjects = W.objects(map, s).map(o => ({ ...o, sort: o.y + o.h }));
+      drawObjects.push({ kind: 'player', x: visual.x, y: visual.y, w: 1, h: 1, sort: visual.y + 1.1 });
       for (let y = 0; y < W.H; y++) for (let x = 0; x < W.W; x++) if (map.tiles[y][x] === 'tree') drawObjects.push({ kind: 'tree', x, y, w: 1, h: 1, sort: y + 1 });
       drawObjects.sort((a, b) => a.sort - b.sort);
       for (const o of drawObjects) {
@@ -105,5 +120,5 @@
     }
     return { draw, tileAt(clientX, clientY) { const r = canvas.getBoundingClientRect(); return { x: Math.floor((clientX - r.left + view.x) / view.tile), y: Math.floor((clientY - r.top + view.y) / view.tile) }; }, get view() { return view; } };
   }
-  root.ForestArt = { create };
+  root.ForestArt = { create, get view() { return latestView && { ...latestView }; } };
 })(globalThis);

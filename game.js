@@ -29,6 +29,7 @@
   const art = ForestArt.create(canvas), ui = ForestUI.create(app);
   const dirs = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
   function interact(object = W.target(app.state)) {
+    if (object) object = W.objects(W.maps[app.state.player.map], app.state).find(o => o.id === object.id);
     if (!object || !W.near(app.state.player, object)) { ui.toast('走近一点，就能和这里的生活打招呼。'); return; }
     app.stopWalking();
     if (object.kind === 'plot') { app.perform(() => C.farm(app.state, Number(object.id.slice(5)))); return; }
@@ -59,7 +60,7 @@
     if (ui.isOpen) return;
     canvas.focus({ preventScroll: true });
     const pos = art.tileAt(event.clientX, event.clientY), map = W.maps[app.state.player.map];
-    const object = W.objectAt(map, pos.x, pos.y);
+    const object = W.objectAt(map, pos.x, pos.y, app.state);
     const next = W.pathTo(app.state, pos.x, pos.y, !!object);
     if (!next) { ui.toast('那边暂时走不过去，换条小路吧。'); return; }
     app.stopWalking(); route = next; pending = object;
@@ -103,7 +104,14 @@
       if (time - lastStep > 150) {
         lastStep = time;
         if (held) step(...dirs[held]);
-        else if (route.length) { const direction = route.shift(); if (!step(...direction)) app.stopWalking(); }
+        else if (route.length) {
+          if (pending && pending.kind === 'npc') {
+            const live = W.objects(W.maps[app.state.player.map], app.state).find(o => o.id === pending.id);
+            if (!live) app.stopWalking();
+            else { pending = live; route = W.pathTo(app.state, live.x, live.y, true) || []; }
+          }
+          if (route.length) { const direction = route.shift(); if (!step(...direction)) app.stopWalking(); }
+        }
         else if (pending) { const target = pending; pending = null; interact(target); }
       }
     }

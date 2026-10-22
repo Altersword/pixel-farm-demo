@@ -46,11 +46,17 @@
   for (const n of root.ForestData.treasures || []) object(t, n.id, 'treasure', n.x, n.y, '金松果');
   object(t, 'fishing', 'fishing', 18, 5, '池塘边的垂钓牌');
   t.portals.push({ x: 14, y: 18, map: 'farm', toX: 14, toY: 2, label: '↓ 苔光农场' });
-  function objectAt(map, x, y) { return map.objects.find(o => x >= o.x && x < o.x + o.w && y >= o.y && y < o.y + o.h); }
+  // Every consumer resolves the same live objects; the base map stays immutable.
+  function objects(map, state) {
+    return root.ForestNeighbors && state
+      ? [...map.objects.filter(o => o.kind !== 'npc'), ...root.ForestNeighbors.objects(state, map.id)]
+      : map.objects;
+  }
+  function objectAt(map, x, y, state) { return objects(map, state).find(o => x >= o.x && x < o.x + o.w && y >= o.y && y < o.y + o.h); }
   function walkable(map, x, y) {
     if (x < 1 || y < 1 || x >= W - 1 || y >= H - 1 || ['tree', 'water'].includes(map.tiles[y][x])) return false;
     const o = objectAt(map, x, y);
-    return !o || ['plot', 'festival', 'decor', 'treasure'].includes(o.kind);
+    return !o || ['plot', 'festival', 'decor', 'treasure', 'npc', 'exploration'].includes(o.kind);
   }
   function near(player, o) {
     const dx = Math.max(o.x - player.x, 0, player.x - (o.x + o.w - 1));
@@ -60,10 +66,10 @@
   function target(state) {
     const p = state.player, map = maps[p.map];
     const facing = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[p.facing];
-    const front = objectAt(map, p.x + facing[0], p.y + facing[1]);
-    const under = objectAt(map, p.x, p.y);
+    const front = objectAt(map, p.x + facing[0], p.y + facing[1], state);
+    const under = objectAt(map, p.x, p.y, state);
     const eligible = o => o && !(o.kind === 'treasure' && state.story && state.story.treasures && state.story.treasures.includes(o.id));
-    return [front, under, ...map.objects.filter(o => near(p, o))].find(eligible);
+    return [front, under, ...objects(map, state).filter(o => near(p, o))].find(eligible);
   }
   function move(state, dx, dy) {
     const p = state.player;
@@ -81,7 +87,7 @@
   // Breadth-first paths also serve as an accessibility aid for click-to-walk.
   function pathTo(state, x, y, adjacent = false) {
     const p = state.player, map = maps[p.map], queue = [[p.x, p.y, []]], seen = new Set([p.x + ',' + p.y]);
-    const obj = objectAt(map, x, y);
+    const obj = objectAt(map, x, y, state);
     while (queue.length) {
       const [cx, cy, path] = queue.shift();
       if (adjacent && obj ? near({ x: cx, y: cy }, obj) : cx === x && cy === y) return path;
@@ -93,6 +99,6 @@
     }
     return null;
   }
-  root.ForestWorld = { maps, W, H, objectAt, walkable, near, target, move, pathTo };
+  root.ForestWorld = { maps, W, H, objects, objectAt, walkable, near, target, move, pathTo };
   if (typeof module !== 'undefined') module.exports = root.ForestWorld;
 })(globalThis);
