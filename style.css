@@ -273,3 +273,40 @@ h1 {
 #tab-content::-webkit-scrollbar { width: 10px; }
 #tab-content::-webkit-scrollbar-track { background: #3a2010; }
 #tab-content::-webkit-scrollbar-thumb { background: #8B4513; border: 2px solid #1a3009; }
+
+.order-summary { color: #FFD700; text-align: center; line-height: 1.9; margin: 8px 0 16px; }
+.order-summary span, .order-tip { color: #e1c8a5; font-size: 12px; line-height: 1.8; }
+.order-card { padding: 20px 14px; background: #3a2010; border: 3px solid #FFD700; text-align: center; }
+.order-neighbor { font-size: 56px; margin-bottom: 12px; }
+.order-card h2 { color: #FFD700; font-size: 18px; }
+.order-card p { color: #e1c8a5; font-size: 12px; line-height: 1.8; margin: 12px 0; }
+.order-ingredients { list-style: none; margin: 18px 0; }
+.order-ingredients li { display: flex; justify-content: space-between; gap: 8px; color: #eee; font-size: 14px; padding: 12px 0; border-bottom: 1px solid #785032; }
+.order-ingredients .enough { color: #7CFC00; }
+.order-reward { color: #FFD700; font-size: 18px; line-height: 1.8; }
+.order-reward small { display: block; font-size: 11px; color: #e1c8a5; }
+#deliver-order { width: 100%; margin-top: 18px; padding: 14px 8px; border: 3px solid #1a3009; background: #FFD700; color: #1a3009; font: inherit; font-size: 14px; cursor: pointer; }
+#deliver-order:disabled { background: #69553f; color: #ddd; cursor: default; }
+button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+.order-tip { margin-top: 14px; }
+
+@media (max-width: 700px) {
+  body { height: auto; overflow: auto; }
+  #game-container { height: auto; min-height: 100vh; }
+  header { padding: 12px; gap: 8px; }
+  h1 { font-size: 17px; letter-spacing: 0; }
+  #coins { font-size: 15px; padding: 8px; }
+  #header-right { gap: 6px; }
+  #music-btn { width: 40px; height: 40px; font-size: 20px; }
+  #main-area { flex-direction: column; }
+  #farm-section { padding: 12px; }
+  #farm-grid { min-height: 280px; gap: 6px; }
+  .plot .crop-icon { font-size: 30px; }
+  #side-panel { width: 100%; border-left: none; border-top: 5px solid #1a3009; }
+  #tab-content { max-height: 460px; }
+  #notification { max-width: 95vw; width: max-content; font-size: 13px; padding: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

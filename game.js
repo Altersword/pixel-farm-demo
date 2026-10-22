@@ -28,6 +28,16 @@ const SHOP_ITEMS = {
   ],
 };
 
+// 固定轮换，刷新不会重置或重抽订单；报酬比直接出售高 50%。
+const ORDERS = [
+  { name: '兔兔的早餐', icon: '🐰', wants: { tomato: 2 } },
+  { name: '松鼠的野餐', icon: '🐿️', wants: { carrot: 2, corn: 1 } },
+  { name: '小熊的果酱', icon: '🐻', wants: { strawberry: 2 } },
+  { name: '河马的消暑派对', icon: '🦛', wants: { watermelon: 1, tomato: 2 } },
+  { name: '狐狸的蔬菜汤', icon: '🦊', wants: { tomato: 1, carrot: 1, corn: 2 } },
+  { name: '森林水果节', icon: '🦉', wants: { strawberry: 2, watermelon: 2 } },
+];
+
 // ============ 游戏状态 ============
 let state = {
   coins: 100,
@@ -36,6 +46,7 @@ let state = {
   plots: [],
   inventory: {},   // { itemId: count }
   seeds: {},       // { cropId: count }
+  ordersCompleted: 0,
 };
 
 // 初始化15块地
@@ -69,12 +80,16 @@ function loadGame() {
     while (state.plots.length < 15) {
       state.plots.push({ crop: null, stage: 0, progress: 0, watered: false, plantedAt: null });
     }
-    // 旧存档补全：确保每种作物至少有2颗种子
+    // 只补全旧存档缺失的种类；0 颗也是有效的库存。
+    state.seeds = state.seeds || {};
     Object.keys(CROPS).forEach(key => {
-      if (!state.seeds[key] || state.seeds[key] < 2) {
-        state.seeds[key] = Math.max(state.seeds[key] || 0, 2);
+      if (!Object.prototype.hasOwnProperty.call(state.seeds, key)) {
+        state.seeds[key] = 2;
       }
     });
+    if (!Number.isSafeInteger(state.ordersCompleted) || state.ordersCompleted < 0) {
+      state.ordersCompleted = 0;
+    }
   }
 }
 
@@ -82,6 +97,7 @@ function loadGame() {
 function updateCoins() {
   coinDisplay.textContent = state.coins;
   saveGame();
+  renderShop();
 }
 
 function showNotification(text) {
@@ -149,6 +165,7 @@ function handlePlotClick(index) {
       showNotification(`收回了${decoItem.name}`);
     }
     plot.decoration = null;
+    saveGame();
     renderFarm();
     renderInventory();
     return;
@@ -203,6 +220,63 @@ function handlePlotClick(index) {
   updateCoins();
   renderFarm();
   renderInventory();
+  renderSeeds();
+}
+
+// ============ 邻里订单 ============
+function currentOrder() {
+  return ORDERS[state.ordersCompleted % ORDERS.length];
+}
+
+function orderReward(order) {
+  const value = Object.entries(order.wants).reduce(
+    (sum, [key, count]) => sum + CROPS[key].sellPrice * count, 0);
+  return Math.ceil(value * 1.5);
+}
+
+function canDeliver(order) {
+  return Object.entries(order.wants).every(
+    ([key, count]) => (state.inventory[key] || 0) >= count);
+}
+
+function deliverOrder() {
+  const order = currentOrder();
+  if (!canDeliver(order)) {
+    showNotification('作物还没凑齐，先去种菜吧~');
+    return;
+  }
+  Object.entries(order.wants).forEach(([key, count]) => {
+    state.inventory[key] -= count;
+  });
+  const reward = orderReward(order);
+  state.coins += reward;
+  state.ordersCompleted++;
+  updateCoins();
+  renderInventory();
+  showNotification(`${order.icon} 交付成功！+${reward}💰`);
+  setStatus(`完成了「${order.name}」，新邻居的订单已送到！`);
+}
+
+function renderOrders() {
+  const panel = $('#orders-panel');
+  const order = currentOrder();
+  const ready = canDeliver(order);
+  panel.innerHTML = `
+    <div class="order-summary">📮 邻里订单板<br><span>已完成 ${state.ordersCompleted} 单 · 第 ${Math.floor(state.ordersCompleted / ORDERS.length) + 1} 轮</span></div>
+    <article class="order-card">
+      <div class="order-neighbor">${order.icon}</div>
+      <h2>${order.name}</h2>
+      <p>新鲜作物，送给森林里的朋友。</p>
+      <ul class="order-ingredients">${Object.entries(order.wants).map(([key, count]) => {
+        const crop = CROPS[key];
+        const owned = state.inventory[key] || 0;
+        return `<li class="${owned >= count ? 'enough' : ''}"><span>${crop.icon} ${crop.name}</span><span>${owned} / ${count}</span></li>`;
+      }).join('')}</ul>
+      <div class="order-reward">报酬 ${orderReward(order)}💰 <small>比直接出售多 50%</small></div>
+      <button id="deliver-order" type="button" ${ready ? '' : 'disabled'}>${ready ? '🧺 交付订单' : '🌱 等待作物凑齐'}</button>
+    </article>
+    <p class="order-tip">收获后留在背包里即可交付。订单没有时限，完成后自动换新，刷新会保留进度。</p>`;
+  $('#deliver-order').addEventListener('click', deliverOrder);
 }
 
 // ============ 成长计时器 ============
@@ -351,6 +425,7 @@ function renderShop() {
 }
 
 function renderInventory() {
+  renderOrders();
   const panel = $('#inventory-panel');
   panel.innerHTML = '';
 
@@ -406,6 +481,7 @@ function renderInventory() {
         if (emptyPlot === -1) { showNotification('农田满了，没有空位！'); return; }
         state.inventory[item.id]--;
         state.plots[emptyPlot] = { crop: null, stage: 0, progress: 0, watered: false, plantedAt: null, decoration: item.icon };
+        saveGame();
         renderFarm();
         renderInventory();
         showNotification(`在农田摆放了${item.name}！`);
@@ -658,6 +734,7 @@ function playMelodyLoop() {
 // ============ 初始化 ============
 function init() {
   loadGame();
+  updateToolButtons();
   updateCoins();
   setupTabs();
 

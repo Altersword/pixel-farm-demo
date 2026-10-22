@@ -31,12 +31,14 @@
           <button class="tab-btn active" data-tab="seeds">种子</button>
           <button class="tab-btn" data-tab="shop">商店</button>
           <button class="tab-btn" data-tab="inventory">背包</button>
+          <button class="tab-btn" data-tab="orders">订单</button>
         </div>
 
         <div id="tab-content">
           <div id="seeds-panel" class="tab-panel active"></div>
           <div id="shop-panel" class="tab-panel"></div>
           <div id="inventory-panel" class="tab-panel"></div>
+          <div id="orders-panel" class="tab-panel"></div>
         </div>
 
         <div id="status-bar">
@@ -45,7 +47,7 @@
       </div>
     </div>
 
-    <div id="notification"></div>
+    <div id="notification" role="status" aria-live="polite"></div>
   </div>
 
   <script src="game.js"></script>
