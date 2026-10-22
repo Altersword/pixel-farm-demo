@@ -23,7 +23,7 @@
     const integer=(n,min=0,max=1e9)=>Number.isSafeInteger(n)&&n>=min&&n<=max;
     if (input.story !== undefined) {
       const q=input.story;
-      if (!q || !integer(q.stage,0,6) || !integer(q.harvests) || !integer(q.gathered) || !Array.isArray(q.met) || q.met.some(id=>!s.friends[id]) || typeof q.festival!=='boolean' || (q.festival !== (q.stage===6))) throw new Error('手札进度格式无效');
+      if (!q || !integer(q.stage,0,6) || !integer(q.harvests) || !integer(q.gathered) || !Array.isArray(q.met) || q.met.some(id=>typeof id!=='string'||!D.neighbors.some(n=>n.id===id)) || typeof q.festival!=='boolean' || (q.festival !== (q.stage===6))) throw new Error('手札进度格式无效');
       s.story={stage:q.stage,met:[...new Set(q.met)],harvests:q.harvests,gathered:q.gathered,festival:q.festival};
     }
     if(input.friends!==undefined) {

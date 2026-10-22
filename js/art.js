@@ -63,9 +63,11 @@
           if (node.resource === 'wood') { rect(x + 6,y+19,T-12,12,spent?'#8d8860':'#95724e'); rect(x + 8,y+17,T-16,5,spent?'#a69b70':'#c2a16e'); if(!spent) {rect(x+12,y+19,3,10,'#7e6045');rect(x+25,y+19,2,10,'#d2b17e');} }
           else { rect(x+6,y+15,T-12,16,spent?'#8d9c7c':'#9eaa9f');rect(x+10,y+11,T-20,9,spent?'#9eac8a':'#b9c1ae');rect(x+7,y+27,T-14,4,'#81917e'); }
           if (!spent) rect(x+T-8,y+10,3,3,'#ead6a0');
+        } else if (o.kind === 'treasure') {
+          if (!s.story.treasures.includes(o.id)) { rect(x+15,y+15,12,12,'#bf965b');rect(x+12,y+12,18,5,'#896b44');rect(x+18,y+9,4,4,'#c9b27c');rect(x+16,y+18,3,5,'#e4c98b'); }
         } else if (o.kind === 'tree') {
           sprites.tree(x, y, T);
-        } else if (['home', 'shop', 'house'].includes(o.kind)) {
+        } else if (['home', 'shop', 'house', 'bakery'].includes(o.kind)) {
           rect(x + 2, y + h - 7, w + 6, 14, '#789360'); rect(x + 4, y + 10, w - 8, h - 10, '#efdfb5');
           rect(x - 5, y - 12, w + 10, 35, o.kind === 'shop' ? '#7b9672' : '#b98067'); rect(x + 3, y - 19, w - 6, 12, o.kind === 'shop' ? '#8ba181' : '#c98d71');
           rect(x + w / 2 - 12, y + h - 42, 24, 42, '#7b644b'); rect(x + 18, y + 35, 24, 22, '#8eb1a3'); rect(x + w - 45, y + 35, 24, 22, '#8eb1a3');

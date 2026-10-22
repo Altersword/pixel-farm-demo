@@ -25,6 +25,7 @@
         return next;
       },
       raw() { return storage.getItem(key); },
+      backup() { return storage.getItem(key + '_damaged_backup') || storage.getItem(key + '_legacy_backup') || storage.getItem(key + '_import_backup') || storage.getItem(key); },
       recover() { const raw = storage.getItem(key); if (raw) storage.setItem(key + '_damaged_backup', raw); },
     };
   }

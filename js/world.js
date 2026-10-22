@@ -30,7 +30,7 @@
   const v = maps.village;
   rect(v, 1, 8, 26, 3, 'path'); rect(v, 12, 2, 3, 16, 'path'); rect(v, 4, 14, 19, 2, 'path');
   object(v, 'shop', 'shop', 5, 3, '栗栗杂货铺', 5, 3);
-  object(v, 'bakery', 'house', 16, 3, '蜜朵的果酱屋', 5, 3);
+  object(v, 'bakery', 'bakery', 16, 3, '蜜朵的果酱屋', 5, 3);
   object(v, 'library', 'house', 5, 16, '星灯书屋', 3, 2);
   object(v, 'town-orders', 'orders', 13, 7, '邻里订单板');
   object(v, 'festival', 'festival', 13, 12, '森林聚会广场', 2, 1);
@@ -43,12 +43,14 @@
   for (const [x, y] of [[3, 3], [6, 4], [9, 2], [4, 14], [8, 16], [18, 14], [22, 15], [24, 11], [18, 8]]) object(t, 'tree-' + x + '-' + y, 'tree', x, y, '松树');
   object(t, 'forest-sign', 'sign', 12, 16, '南方是家，北方有风');
   for (const n of root.ForestData.resources) object(t, n.id, 'resource', n.x, n.y, root.ForestData.materialNames[n.resource] + '采集点');
+  for (const n of root.ForestData.treasures || []) object(t, n.id, 'treasure', n.x, n.y, '金松果');
+  object(t, 'fishing', 'fishing', 18, 5, '池塘边的垂钓牌');
   t.portals.push({ x: 14, y: 18, map: 'farm', toX: 14, toY: 2, label: '↓ 苔光农场' });
   function objectAt(map, x, y) { return map.objects.find(o => x >= o.x && x < o.x + o.w && y >= o.y && y < o.y + o.h); }
   function walkable(map, x, y) {
     if (x < 1 || y < 1 || x >= W - 1 || y >= H - 1 || ['tree', 'water'].includes(map.tiles[y][x])) return false;
     const o = objectAt(map, x, y);
-    return !o || ['plot', 'festival', 'decor'].includes(o.kind);
+    return !o || ['plot', 'festival', 'decor', 'treasure'].includes(o.kind);
   }
   function near(player, o) {
     const dx = Math.max(o.x - player.x, 0, player.x - (o.x + o.w - 1));
@@ -60,7 +62,8 @@
     const facing = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[p.facing];
     const front = objectAt(map, p.x + facing[0], p.y + facing[1]);
     const under = objectAt(map, p.x, p.y);
-    return front || under || map.objects.find(o => near(p, o));
+    const eligible = o => o && !(o.kind === 'treasure' && state.story && state.story.treasures && state.story.treasures.includes(o.id));
+    return [front, under, ...map.objects.filter(o => near(p, o))].find(eligible);
   }
   function move(state, dx, dy) {
     const p = state.player;

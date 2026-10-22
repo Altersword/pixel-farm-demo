@@ -18,7 +18,7 @@
     perform(action) { const result = action(); if (result.ok) app.save(); audio.effect(result.ok); ui.toast(result.message); ui.refresh(); return result; },
     applySettings() { document.body.classList.toggle('reduced-motion', app.state.settings.reducedMotion); audio.set(app.state.settings.mute).catch(() => ui.toast('声音暂时无法启用，游戏仍可正常游玩。')); },
     download(raw = false) {
-      const data = raw ? storage.raw() : storage.export(app.state);
+      const data = raw ? storage.backup() : storage.export(app.state);
       if (!data) { ui.toast('还没有原始存档。'); return; }
       const url = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
       const link = document.createElement('a'); link.href = url; link.download = raw ? 'moss-original-backup.json' : 'moss-and-morning-save.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -33,6 +33,8 @@
     app.stopWalking();
     if (object.kind === 'plot') { app.perform(() => C.farm(app.state, Number(object.id.slice(5)))); return; }
     if (object.kind === 'resource') { app.perform(() => C.gather(app.state, object.id)); return; }
+    if (object.kind === 'treasure') { app.perform(() => C.discover(app.state, object.id)); return; }
+    if (object.kind === 'fishing' || object.kind === 'bakery') { ui.open('activity', { id: object.kind === 'fishing' ? 'hippo' : 'bear' }); return; }
     if (object.kind === 'decor') {
       const index = Number(object.id.slice(6));
       if (index >= 3 + app.state.expansion * 2) { ui.toast('继续扩建农场，就能开放这个装饰位。'); return; }
@@ -108,6 +110,7 @@
     if (time - lastGrowth > 1000) { C.grow(app.state); ui.refresh(); lastGrowth = time; }
     if (time - lastSave > 5000) { app.save(); lastSave = time; }
     art.draw(app.state, time);
+    ui.tick();
     audio.scene(app.state.player.map, app.state.world.elapsed % D.dayLength / D.dayLength > .75);
     requestAnimationFrame(frame);
   }

@@ -40,7 +40,7 @@
     if (input.plots !== undefined) {
       if (!Array.isArray(input.plots) || input.plots.length > 30) throw new Error('农田格式无效');
       state.plots = input.plots.map(plot => {
-        if (!plot || typeof plot !== 'object' || (plot.crop !== null && !D.crops[plot.crop])) throw new Error('未知作物');
+        if (!plot || typeof plot !== 'object' || (plot.crop !== null && (typeof plot.crop !== 'string' || !Object.hasOwn(D.crops, plot.crop)))) throw new Error('未知作物');
         const p = emptyPlot();
         p.crop = plot.crop;
         if (p.crop) {
@@ -58,7 +58,7 @@
       });
       while (state.plots.length < 15) state.plots.push(emptyPlot());
     }
-    if (D.crops[input.selectedSeed]) state.selectedSeed = input.selectedSeed;
+    if (typeof input.selectedSeed === 'string' && Object.hasOwn(D.crops,input.selectedSeed)) state.selectedSeed = input.selectedSeed;
     if (['plant', 'water', 'harvest'].includes(input.tool)) state.tool = input.tool;
     if (input.player && ['farm', 'forest', 'village'].includes(input.player.map)
       && Number.isInteger(input.player.x) && input.player.x >= 1 && input.player.x <= 26
@@ -91,7 +91,7 @@
       if (!Array.isArray(input.decorations) || input.decorations.length > 3 + state.expansion * 2) throw new Error('装饰位置无效');
       state.decorations = input.decorations.map(id => {
         if (id === null) return null;
-        if (!D.items[id] || D.items[id].kind !== 'decor') throw new Error('未知家园装饰');
+        if (typeof id !== 'string' || !Object.hasOwn(D.items,id) || D.items[id].kind !== 'decor') throw new Error('未知家园装饰');
         return id;
       });
     }

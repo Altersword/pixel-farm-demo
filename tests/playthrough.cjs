@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const assert = require('node:assert/strict');
 const { read, walk, clickTile } = require('./helpers.cjs');
 const D = require('../js/data.js');
+const activities = require('./activities-browser.cjs');
 const root = path.resolve(__dirname, '..');
 const output = process.env.FOREST_OUTPUT || path.resolve(root, '../../outputs');
 const profile = process.env.FOREST_PROFILE || path.resolve(root, '../normal-play-profile');
@@ -58,6 +59,8 @@ async function run(page) {
     await area('farm'); let s = await read(page);
     const needs = Object.fromEntries(Object.keys(D.crops).map(id => [id, 0]));
     for (let i = s.ordersCompleted; i < 12; i++) for (const [id, n] of Object.entries(D.orders[i % 6].wants)) needs[id] += n;
+    const activityData = await page.evaluate(()=>ForestData.activities);
+    for (const [id,a] of Object.entries(activityData)) if (!s.story.activities[id] && a.costs) for (const [crop,n] of Object.entries(a.costs)) needs[crop] += n;
     let planted = 0;
     for (const id of Object.keys(D.crops)) {
       s = await read(page);
@@ -105,6 +108,7 @@ async function run(page) {
   if (await page.locator('[data-action=welcome]').count()) await page.locator('[data-action=welcome]').click();
   let s = await read(page);
   log(`正常存档起点：章节 ${s.story.stage}，订单 ${s.ordersCompleted}，金币 ${s.coins}`);
+  const activityHelpers={area,go,close,log};
   if (s.story.stage < 4) {
     await plant(); await gather(); await area('village');
     for (const n of D.neighbors) { await go(n.id); await page.waitForSelector('#panel[open]'); await close(); }
@@ -112,6 +116,7 @@ async function run(page) {
     // Daily materials replenish via the ordinary home interaction, not the clock.
     await go('home'); await page.locator('[data-action=rest]').click(); await gather(); await build();
   }
+  await activities.nonFood(page,activityHelpers);
   for (let loop = 0; loop < 100; loop++) {
     s = await read(page); if (s.ordersCompleted >= 12) break;
     await harvest(); await claim(); await build(); await plant();
@@ -124,7 +129,15 @@ async function run(page) {
     log('等待实际生长时间；没有更改时钟、库存或种植时间');
     await page.waitForFunction(() => JSON.parse(localStorage.getItem('pixel_farm_save')).plots.some(p => p.crop && p.progress >= 100), null, { timeout: 150000 });
   }
-  assert.equal((await read(page)).ordersCompleted, 12); await build(); await claim();
+  assert.equal((await read(page)).ordersCompleted, 12);
+  for(let tries=0;tries<10;tries++){
+    if(await activities.food(page,activityHelpers))break;
+    await harvest();await plant();
+    const state=await read(page);
+    if(!state.plots.some(p=>p.crop))throw new Error('Party ingredients could not be grown');
+    await page.waitForFunction(()=>JSON.parse(localStorage.getItem('pixel_farm_save')).plots.some(p=>p.crop&&p.progress>=100),null,{timeout:150000});
+  }
+  await build(); await claim();
   s = await read(page); assert.equal(s.story.stage, 5); assert.equal(s.expansion, 3);
   assert.ok(Object.keys(D.recipes).every(id => s.crafted[id] > 0)); assert.ok(D.neighbors.every(n => s.friends[n.id].points >= 3));
   await area('village'); await go('festival'); await page.waitForSelector('#panel[open]'); await page.locator('[data-action=festival]').click();

@@ -7,6 +7,7 @@
     const panel = $('#panel'), content = $('#panel-content');
     let openKind = '', context = null, toastTimer, lastHTML = '';
     const button = (label, action, id = '', disabled = false, secondary = false) => `<button class="btn${secondary ? ' secondary' : ''}" data-action="${action}" data-id="${id}" ${disabled ? 'disabled' : ''}>${label}</button>`;
+    const mini = root.ForestActivitiesUI.create(app, { toast, refresh });
     function row(name, desc, actions, color = '#b9c69b') { return `<div class="item-row"><span class="swatch" style="--item-color:${color}"></span><div class="item-body"><h3>${esc(name)}</h3><p>${desc}</p></div>${actions}</div>`; }
     function toast(text) {
       clearTimeout(toastTimer); $('#scene-toast').textContent = text; $('#scene-toast').classList.add('show');
@@ -29,7 +30,9 @@
       if (panel.open) render();
     }
     function open(kind, data = null) {
-      openKind = kind; context = data; $('#panel-notice').hidden = true; app.stopWalking(); render();
+      openKind = kind; context = data; $('#panel-notice').hidden = true; app.stopWalking();
+      if (kind === 'activity') mini.start(data.id);
+      render();
       if (!panel.open) panel.showModal();
     }
     function close() { panel.close(); openKind = ''; app.canvas.focus({ preventScroll: true }); }
@@ -62,6 +65,9 @@
       } else if (openKind === 'npc') {
         const n = D.neighbors.find(n => n.id === context.id), f=s.friends[n.id]; title = n.name + '的问候';
         html = `<p class="eyebrow">${n.species} / ${f.points>=6?'亲密朋友':f.points>=3?'森林朋友':'初识的邻居'}</p><p class="dialogue-copy">「${C.dialogue(s,n.id)}」</p><p class="pill">好感 ${f.points} · 最喜欢${D.crops[n.likes].name}</p><p class="panel-copy">每天首次聊天 +1；交付这位邻居的订单 +2；每天可送一份喜欢的作物 +2。好感达到 3 收到纪念礼，达到 6 解锁新对话。</p>${button(`送一份${D.crops[n.likes].name}（拥有 ${s.inventory[n.likes]||0}）`,'gift',n.id,!(s.inventory[n.likes]>0)||f.lastGiftDay===C.day(s))}`;
+        html += `<div class="btn-row">${button(s.story.activities[n.id]?'聚会心意已备好':'一起准备一份聚会心意','activity-open',n.id)}</div>`;
+      } else if (openKind === 'activity') {
+        title = D.activities[context.id].title; html = mini.render(context.id);
       } else if (openKind === 'workbench') {
         title = '让双手做一点喜欢的东西';
         html = `<p class="panel-copy">材料来自风铃森林。每日可重新采集，也可以回小屋休息迎接新的一天。</p><p class="pill">木材 ${s.materials.wood} · 石料 ${s.materials.stone}</p>`;
@@ -110,6 +116,9 @@
       if (action === 'expand') app.perform(() => C.expand(s));
       if (action === 'rest') { app.perform(() => C.rest(s)); close(); }
       if (action === 'journal') open('journal');
+      if (action === 'activity-open') open('activity', { id });
+      else if (action === 'activity-back') open('npc', { id });
+      else if (action.startsWith('activity-')) mini.action(action,id);
       if (action === 'welcome') { s.settings.onboardingSeen = true; app.save(); close(); }
       if (action === 'recover') app.recover();
       if (action === 'place') {
@@ -127,7 +136,7 @@
     $('#close-panel').addEventListener('click', close);
     panel.addEventListener('close', () => { openKind = ''; app.stopWalking(); });
     $('#farm-tools').addEventListener('click', () => open('tools'));
-    return { open, close, refresh, toast, get isOpen() { return panel.open; } };
+    return { open, close, refresh, toast, tick() { if (panel.open && openKind === 'activity') mini.tick(); }, get isOpen() { return panel.open; } };
   }
   root.ForestUI = { create, esc };
 })(globalThis);
