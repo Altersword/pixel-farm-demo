@@ -29,8 +29,16 @@
     if (!object || !W.near(app.state.player, object)) { ui.toast('走近一点，就能和这里的生活打招呼。'); return; }
     app.stopWalking();
     if (object.kind === 'plot') { app.perform(() => C.farm(app.state, Number(object.id.slice(5)))); return; }
+    if (object.kind === 'resource') { app.perform(() => C.gather(app.state, object.id)); return; }
+    if (object.kind === 'decor') {
+      const index = Number(object.id.slice(6));
+      if (index >= 3 + app.state.expansion * 2) { ui.toast('继续扩建农场，就能开放这个装饰位。'); return; }
+      if (app.state.decorations[index]) app.perform(() => C.retrieve(app.state, index));
+      else ui.open('bag', object);
+      return;
+    }
     if (object.kind === 'sign') { ui.toast(object.name); return; }
-    ui.open({ home: 'journal', bag: 'bag', shop: 'shop', orders: 'orders', npc: 'npc' }[object.kind] || object.kind, object);
+    ui.open({ home: 'home', bag: 'bag', shop: 'shop', orders: 'orders', npc: 'npc' }[object.kind] || object.kind, object);
   }
   function step(dx, dy) {
     const before = app.state.player.map;

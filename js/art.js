@@ -51,6 +51,18 @@
             else { rect(x + T - 7, y + 4, 3, 3, '#f3df9c'); }
           }
           if (plot.decoration) sprites.furniture(D.items[plot.decoration].sprite, x, y, T);
+        } else if (o.kind === 'decor') {
+          const index = Number(o.id.slice(6)), id = s.decorations[index];
+          if (index < 3 + s.expansion * 2) {
+            rect(x + 2, y + 3, T - 4, T - 6, '#9eaf7b');
+            if (id) sprites.furniture(D.items[id].sprite, x, y, T);
+            else { rect(x + T / 2 - 3, y + T / 2, 7, 1, '#dce1b0'); rect(x + T / 2, y + T / 2 - 3, 1, 7, '#dce1b0'); }
+          }
+        } else if (o.kind === 'resource') {
+          const node = D.resources.find(n => n.id === o.id), spent = s.world.gathered[o.id] === Math.floor(s.world.elapsed / D.dayLength);
+          if (node.resource === 'wood') { rect(x + 6,y+19,T-12,12,spent?'#8d8860':'#95724e'); rect(x + 8,y+17,T-16,5,spent?'#a69b70':'#c2a16e'); if(!spent) {rect(x+12,y+19,3,10,'#7e6045');rect(x+25,y+19,2,10,'#d2b17e');} }
+          else { rect(x+6,y+15,T-12,16,spent?'#8d9c7c':'#9eaa9f');rect(x+10,y+11,T-20,9,spent?'#9eac8a':'#b9c1ae');rect(x+7,y+27,T-14,4,'#81917e'); }
+          if (!spent) rect(x+T-8,y+10,3,3,'#ead6a0');
         } else if (o.kind === 'tree') {
           sprites.tree(x, y, T);
         } else if (['home', 'shop', 'house'].includes(o.kind)) {

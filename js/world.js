@@ -26,6 +26,7 @@
   rect(f, 21, 14, 4, 3, 'water');
   f.portals.push({ x: 26, y: 9, map: 'village', toX: 2, toY: 9, label: '栗风小镇 →' }, { x: 14, y: 1, map: 'forest', toX: 14, toY: 17, label: '↑ 风铃森林' });
   for (let i = 0; i < 30; i++) object(f, 'plot-' + i, 'plot', 7 + i % 5, 8 + Math.floor(i / 5), '农田 ' + (i + 1));
+  for (let i = 0; i < 9; i++) object(f, 'decor-' + i, 'decor', 18 + i % 3 * 2, 4 + Math.floor(i / 3) * 4, '家园装饰位 ' + (i + 1));
   const v = maps.village;
   rect(v, 1, 8, 26, 3, 'path'); rect(v, 12, 2, 3, 16, 'path'); rect(v, 4, 14, 19, 2, 'path');
   object(v, 'shop', 'shop', 5, 3, '栗栗杂货铺', 5, 3);
@@ -41,12 +42,13 @@
   rect(t, 19, 3, 6, 4, 'water');
   for (const [x, y] of [[3, 3], [6, 4], [9, 2], [4, 14], [8, 16], [18, 14], [22, 15], [24, 11], [18, 8]]) object(t, 'tree-' + x + '-' + y, 'tree', x, y, '松树');
   object(t, 'forest-sign', 'sign', 12, 16, '南方是家，北方有风');
+  for (const n of root.ForestData.resources) object(t, n.id, 'resource', n.x, n.y, root.ForestData.materialNames[n.resource] + '采集点');
   t.portals.push({ x: 14, y: 18, map: 'farm', toX: 14, toY: 2, label: '↓ 苔光农场' });
   function objectAt(map, x, y) { return map.objects.find(o => x >= o.x && x < o.x + o.w && y >= o.y && y < o.y + o.h); }
   function walkable(map, x, y) {
     if (x < 1 || y < 1 || x >= W - 1 || y >= H - 1 || ['tree', 'water'].includes(map.tiles[y][x])) return false;
     const o = objectAt(map, x, y);
-    return !o || ['plot', 'festival'].includes(o.kind);
+    return !o || ['plot', 'festival', 'decor'].includes(o.kind);
   }
   function near(player, o) {
     const dx = Math.max(o.x - player.x, 0, player.x - (o.x + o.w - 1));

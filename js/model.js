@@ -8,7 +8,8 @@
       plots: Array.from({ length: 15 }, emptyPlot), inventory: {},
       seeds: { tomato: 5, carrot: 3, corn: 2, strawberry: 2, watermelon: 2 },
       ordersCompleted: 0, player: { map: 'farm', x: 14, y: 8, facing: 'down' },
-      world: { elapsed: 0, visited: ['farm'] }, settings: { mute: true, reducedMotion: false },
+      world: { elapsed: 0, visited: ['farm'], gathered: {} }, settings: { mute: true, reducedMotion: false },
+      materials: { wood: 0, stone: 0 }, crafted: {}, expansion: 0, decorations: [],
     };
   }
   function migrate(input) {
@@ -69,6 +70,37 @@
       if (Array.isArray(input.world.visited)) state.world.visited = ['farm', 'forest', 'village'].filter(x => input.world.visited.includes(x));
     }
     if (input.settings) state.settings = { mute: input.settings.mute !== false, reducedMotion: !!input.settings.reducedMotion };
+    for (const field of ['materials', 'crafted']) {
+      if (input[field] !== undefined) {
+        if (!input[field] || typeof input[field] !== 'object' || Array.isArray(input[field])) throw new Error('家园库存格式无效');
+        for (const id of field === 'materials' ? ['wood', 'stone'] : Object.keys(D.recipes)) {
+          if (input[field][id] !== undefined) {
+            if (!nonnegative(input[field][id])) throw new Error('家园库存数量无效');
+            state[field][id] = input[field][id];
+          }
+        }
+      }
+    }
+    state.expansion = Math.min(3, Math.max(0, Math.ceil((state.plots.length - 15) / 5)));
+    if (input.expansion !== undefined) {
+      if (!Number.isInteger(input.expansion) || input.expansion < 0 || input.expansion > 3 || input.expansion !== state.expansion) throw new Error('扩建等级与农田数量不一致');
+    }
+    while (state.plots.length < 15 + state.expansion * 5) state.plots.push(emptyPlot());
+    if (input.decorations !== undefined) {
+      if (!Array.isArray(input.decorations) || input.decorations.length > 3 + state.expansion * 2) throw new Error('装饰位置无效');
+      state.decorations = input.decorations.map(id => {
+        if (id === null) return null;
+        if (!D.items[id] || D.items[id].kind !== 'decor') throw new Error('未知家园装饰');
+        return id;
+      });
+    }
+    if (input.world && input.world.gathered) for (const node of D.resources) {
+      const day = input.world.gathered[node.id];
+      if (day !== undefined) {
+        if (!nonnegative(day) || day > Math.floor(state.world.elapsed / D.dayLength)) throw new Error('采集记录无效');
+        state.world.gathered[node.id] = day;
+      }
+    }
     return state;
   }
   function grow(state, now = Date.now()) {
@@ -119,6 +151,7 @@
     const item = seed ? D.crops[id] : D.items[id];
     if (!item) return { ok: false, message: '没有这件商品。' };
     const cost = seed ? item.seedPrice : item.price;
+    if (!Number.isFinite(cost)) return { ok: false, message: '这件物品需要亲手制作。' };
     if (s.coins < cost) return { ok: false, message: '叶币还不够，收获或完成订单再来吧。' };
     s.coins -= cost;
     const bag = seed ? s.seeds : s.inventory;
@@ -133,6 +166,47 @@
     s.inventory[id]--; s.coins += amount;
     return { ok: true, message: `获得 ${amount} 枚叶币。` };
   }
-  root.ForestCore = { newGame, migrate, emptyPlot, grow, farm, currentOrder, reward, canDeliver, deliver, buy, sell };
+  const day = s => Math.floor(s.world.elapsed / D.dayLength);
+  const affordable = (s, costs) => Object.entries(costs).every(([id, n]) => (s.materials[id] || 0) >= n);
+  function spend(s, costs) { for (const [id, n] of Object.entries(costs)) s.materials[id] -= n; }
+  function gather(s, id) {
+    const node = D.resources.find(n => n.id === id);
+    if (!node) return { ok: false, message: '这里没有可采集的材料。' };
+    if (s.world.gathered[id] === day(s)) return { ok: false, message: '今天已采集过，明天再来看看。' };
+    s.world.gathered[id] = day(s); s.materials[node.resource] += 3;
+    return { ok: true, message: `收集到 3 份${D.materialNames[node.resource]}，谢谢森林的礼物。` };
+  }
+  function craft(s, id) {
+    const recipe = D.recipes[id];
+    if (!recipe || !affordable(s, recipe.costs)) return { ok: false, message: '材料还不够，去森林找找吧。' };
+    spend(s, recipe.costs); s.inventory[id] = (s.inventory[id] || 0) + 1; s.crafted[id] = (s.crafted[id] || 0) + 1;
+    return { ok: true, message: `${recipe.name}做好了！放进背包，回空装饰位旁摆放。` };
+  }
+  function expand(s) {
+    const e = D.expansions[s.expansion];
+    if (!e) return { ok: false, message: '家园已扩建到最大。' };
+    if (s.coins < e.coins || !affordable(s, e.costs)) return { ok: false, message: '扩建需要的叶币或材料还不够。' };
+    spend(s, e.costs); s.coins -= e.coins; s.expansion++;
+    for (let i = 0; i < 5; i++) s.plots.push(emptyPlot());
+    return { ok: true, message: `「${e.name}」完工！新增 5 块农田与 2 个装饰位。` };
+  }
+  function place(s, id, index) {
+    if (!D.items[id] || D.items[id].kind !== 'decor' || !(s.inventory[id] > 0)) return { ok: false, message: '背包里没有这件装饰。' };
+    if (!Number.isInteger(index) || index < 0 || index >= 3 + s.expansion * 2 || s.decorations[index]) return { ok: false, message: '请选一个开放的空装饰位。' };
+    while (s.decorations.length <= index) s.decorations.push(null);
+    s.decorations[index] = id; s.inventory[id]--;
+    return { ok: true, message: '家里又多了一处喜欢的风景。' };
+  }
+  function retrieve(s, index) {
+    const id = s.decorations[index];
+    if (!id) return { ok: false, message: '这里还空着。' };
+    s.inventory[id] = (s.inventory[id] || 0) + 1; s.decorations[index] = null;
+    return { ok: true, message: '已收回背包，换个地方再布置也好。' };
+  }
+  function rest(s) {
+    s.world.elapsed = (day(s) + 1) * D.dayLength;
+    return { ok: true, message: '在鸟鸣里醒来，新的一天到了。森林材料已补充，作物仍按现实时间成长。' };
+  }
+  root.ForestCore = { newGame, migrate, emptyPlot, grow, farm, currentOrder, reward, canDeliver, deliver, buy, sell, day, affordable, gather, craft, expand, place, retrieve, rest };
   if (typeof module !== 'undefined') module.exports = root.ForestCore;
 })(globalThis);

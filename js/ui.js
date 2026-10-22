@@ -36,7 +36,7 @@
         html += Object.entries(D.crops).map(([id, crop]) => row(crop.name, `种子 ${s.seeds[id] || 0} 颗 · 生长 ${crop.growTime} 秒`, button(s.selectedSeed === id ? '已选' : '选择', 'seed', id), crop.color)).join('');
       } else if (openKind === 'bag') {
         title = '随身的小背包';
-        html = '<p class="panel-copy">收获可以出售，也可以留给订单。装饰品可以摆在农场的空地块上。</p>';
+        html = `<p class="panel-copy">收获可以出售，也可以留给订单。装饰品可摆在农场的空装饰位或空地块上。</p><p class="pill">木材 ${s.materials.wood} · 石料 ${s.materials.stone}</p>`;
         html += Object.entries(s.inventory).filter(([, n]) => n > 0).map(([id, n]) => {
           const crop = D.crops[id], item = D.items[id];
           return row((crop || item).name + ' × ' + n, crop ? `出售 ${crop.sellPrice} 叶币 / 个` : item.kind === 'decor' ? '保留一份家的温度' : '食用或送出可换回部分叶币', button(crop ? '出售' : item.kind === 'decor' ? '摆放' : '使用', item && item.kind === 'decor' ? 'place' : 'sell', id), crop && crop.color);
@@ -47,12 +47,23 @@
         html = '<p class="panel-copy">一颗种子，就是一个新的小计划。</p>';
         html += Object.entries(D.crops).map(([id, c]) => row(c.name + '种子', `拥有 ${s.seeds[id] || 0} 颗 · 成熟后可售 ${c.sellPrice} 叶币`, button(c.seedPrice + ' 叶币', 'buyseed', id, s.coins < c.seedPrice), c.color)).join('');
         html += '<h3 class="side-title" style="margin-top:20px">杂货与小礼物</h3>';
-        html += Object.entries(D.items).map(([id, item]) => row(item.name, `拥有 ${s.inventory[id] || 0} 件`, button(item.price + ' 叶币', 'buy', id, s.coins < item.price))).join('');
+        html += Object.entries(D.items).filter(([, item]) => Number.isFinite(item.price)).map(([id, item]) => row(item.name, `拥有 ${s.inventory[id] || 0} 件`, button(item.price + ' 叶币', 'buy', id, s.coins < item.price))).join('');
       } else if (openKind === 'orders') {
         title = '邻里订单板'; const order = C.currentOrder(s), n = D.neighbors.find(n => n.id === order.neighbor);
         html = `<p class="panel-copy">没有截止日期。慢慢种，等作物成熟了再来。已完成 ${s.ordersCompleted} 单。</p><article class="order-card"><span class="eyebrow">来自${n.name}的信</span><h3>${order.name}</h3>${Object.entries(order.wants).map(([id, count]) => `<div class="ingredient ${(s.inventory[id] || 0) >= count ? 'enough' : ''}"><span>${D.crops[id].name}</span><span>${s.inventory[id] || 0} / ${count}</span></div>`).join('')}<div class="reward">${C.reward(order)} 叶币<small>比直接出售多 50% · 向上取整</small></div>${button('交付这一份心意', 'deliver', '', !C.canDeliver(s))}</article>`;
       } else if (openKind === 'npc') {
         const n = D.neighbors.find(n => n.id === context.id); title = n.name + '的问候'; html = `<p class="panel-copy">${n.greeting}</p><p class="pill">最喜欢${D.crops[n.likes].name}</p>`;
+      } else if (openKind === 'workbench') {
+        title = '让双手做一点喜欢的东西';
+        html = `<p class="panel-copy">材料来自风铃森林。每日可重新采集，也可以回小屋休息迎接新的一天。</p><p class="pill">木材 ${s.materials.wood} · 石料 ${s.materials.stone}</p>`;
+        html += Object.entries(D.recipes).map(([id, r]) => row(r.name, Object.entries(r.costs).map(([k,n]) => `${D.materialNames[k]} ${n}`).join(' · ') + ` · 已制作 ${s.crafted[id] || 0} 件`, button('制作', 'craft', id, !C.affordable(s,r.costs)))).join('');
+      } else if (openKind === 'expand') {
+        title = '把家园慢慢种大'; const next = D.expansions[s.expansion];
+        html = `<p class="panel-copy">扩建等级 ${s.expansion} / 3 · 农田 ${s.plots.length} 块 · 装饰位 ${3+s.expansion*2} 个。每级新增 5 块农田和 2 个装饰位。</p>`;
+        html += next ? `<div class="order-card"><h3>${next.name}</h3><p class="panel-copy">${next.coins} 叶币 · ${Object.entries(next.costs).map(([k,n])=>`${D.materialNames[k]} ${s.materials[k]}/${n}`).join(' · ')}</p>${button('开始扩建', 'expand', '', s.coins < next.coins || !C.affordable(s,next.costs))}</div>` : '<p class="notice">家园已经全部开放。好好享受你亲手布置的小天地吧。</p>';
+      } else if (openKind === 'home') {
+        title = '灯亮着的地方就是家';
+        html = `<p class="panel-copy">今天也辛苦了。休息会迎来下一个清晨，森林材料会重新出现。作物依旧按现实时间慢慢成长。</p>${button('休息到明天', 'rest')}<div class="btn-row">${button('翻开手札', 'journal', '', false, true)}</div>`;
       } else if (openKind === 'settings') {
         title = '把日子调成喜欢的样子';
         html = `<label class="setting-row">静音<input type="checkbox" data-setting="mute" ${s.settings.mute ? 'checked' : ''}></label><label class="setting-row">减少动态效果<input type="checkbox" data-setting="reducedMotion" ${s.settings.reducedMotion ? 'checked' : ''}></label><p class="panel-copy">存档保存在当前浏览器。换浏览器或设备前，请先导出备份。</p><div class="btn-row">${button('导出存档', 'export')}${button('导入存档', 'import', '', false, true)}${button('导出原始备份', 'raw', '', false, true)}</div><p class="panel-copy">WASD / 方向键移动，E 互动，B 背包，J 手札，Esc 关闭。点击地图会自动走近目标；手机也能用底部方向按钮。</p>${app.protected ? '<p class="notice">原始存档有问题，自动保存已暂停。先导出原始备份，再导入有效存档恢复。</p>' : ''}`;
@@ -77,9 +88,15 @@
       if (action === 'buyseed' || action === 'buy') app.perform(() => C.buy(s, id, action === 'buyseed'));
       if (action === 'sell') app.perform(() => C.sell(s, id));
       if (action === 'deliver') app.perform(() => C.deliver(s));
+      if (action === 'craft') app.perform(() => C.craft(s, id));
+      if (action === 'expand') app.perform(() => C.expand(s));
+      if (action === 'rest') { app.perform(() => C.rest(s)); close(); }
+      if (action === 'journal') open('journal');
       if (action === 'place') {
         if (s.player.map !== 'farm') { toast('回农场再布置吧。'); return; }
-        const o = W.target(s), p = o && o.kind === 'plot' ? s.plots[Number(o.id.slice(5))] : null;
+        const o = context && context.kind === 'decor' ? context : W.target(s);
+        if (o && o.kind === 'decor' && W.near(s.player,o)) { app.perform(() => C.place(s, id, Number(o.id.slice(6)))); return; }
+        const p = o && o.kind === 'plot' ? s.plots[Number(o.id.slice(5))] : null;
         if (!p || p.crop || p.decoration) { toast('先走到一块空农田旁，再从背包摆放。'); return; }
         p.decoration = id; s.inventory[id]--; app.save(); refresh(); toast('把喜欢的东西放在家里。');
       }

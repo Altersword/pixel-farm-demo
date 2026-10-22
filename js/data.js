@@ -39,6 +39,21 @@
     music_box: { name: '音乐盒', price: 200, kind: 'gift' },
   };
   const legacyDecor = { '🪴': 'flower_pot', '🌀': 'windmill', '🧑‍🌾': 'scarecrow', '🏠': 'fence' };
-  root.ForestData = { crops, neighbors, orders, items, legacyDecor, dayLength: 720000 };
+  const recipes = {
+    flowerbox: { name: '林间花箱', costs: { wood: 3 }, sprite: 'flowerbox' },
+    bench: { name: '午后长椅', costs: { wood: 5, stone: 1 }, sprite: 'bench' },
+    lamp: { name: '萤火路灯', costs: { wood: 4, stone: 3 }, sprite: 'lamp' },
+  };
+  for (const [id, recipe] of Object.entries(recipes)) items[id] = { name: recipe.name, kind: 'decor', sprite: recipe.sprite };
+  const expansions = [
+    { name: '一畦新绿', coins: 80, costs: { wood: 3, stone: 2 } },
+    { name: '多一点阳光', coins: 160, costs: { wood: 5, stone: 3 } },
+    { name: '把家园种满', coins: 280, costs: { wood: 7, stone: 5 } },
+  ];
+  const resources = [
+    ...[[5,7],[8,12],[17,12],[23,9],[4,6],[10,14]].map(([x,y],i) => ({id:'wood-'+i, resource:'wood', x,y})),
+    ...[[8,6],[18,9],[21,13],[6,16]].map(([x,y],i) => ({id:'stone-'+i, resource:'stone', x,y})),
+  ];
+  root.ForestData = { crops, neighbors, orders, items, legacyDecor, recipes, expansions, resources, materialNames: { wood: '木材', stone: '石料' }, dayLength: 720000 };
   if (typeof module !== 'undefined') module.exports = root.ForestData;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
