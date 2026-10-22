@@ -41,6 +41,7 @@
     if(f.points>=3&&!f.rewarded) { f.rewarded=true;s.inventory[id+'_keepsake']=(s.inventory[id+'_keepsake']||0)+1;return ' 还收到一份纪念礼，已放进背包。'; }
     return '';
   }
+  C.addFriend=addFriend;
   C.talk=function(s,id) {
     const n=D.neighbors.find(n=>n.id===id); if(!n)return {ok:false,message:'风吹过，没有人回答。'};
     if(!s.story.met.includes(id))s.story.met.push(id);

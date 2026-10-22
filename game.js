@@ -11,7 +11,7 @@
     state: loaded.state, protected: !!loaded.protected, canvas,
     follow(id) {
       const o = W.objects(W.maps[app.state.player.map], app.state).find(o => o.id === id);
-      if (!o) { ui.toast('先向东来到栗风小镇，再从通讯录找到朋友。'); return; }
+      if (!o) { ui.toast(app.state.hospitality?.active?.neighbor===id?'这位朋友正在你的小屋等你。':'先来到栗风小镇，再从通讯录找到朋友。'); return; }
       ui.close(); app.stopWalking(); pending = o; route = W.pathTo(app.state, o.x, o.y, true) || [];
       if (!route.length) { pending = null; interact(o); }
     },
@@ -67,6 +67,7 @@
       else ui.open('bag', object);
       return;
     }
+    if(object.kind==='guest'||object.kind==='dining'){ui.open('dining');return;}
     if (object.kind === 'room-decor') { app.perform(()=>C.retrieveHome(app.state,object.x,object.y));return; }
     if (object.kind === 'bed') { ui.open('home');return; }
     if (object.kind === 'sign') { ui.toast(object.name); return; }
@@ -135,7 +136,7 @@
         if (held && app.placement) { const [dx,dy]=dirs[held];app.placement.x=Math.max(7,Math.min(20,app.placement.x+dx));app.placement.y=Math.max(5,Math.min(14,app.placement.y+dy));showPlacement(); }
         else if (held) step(...dirs[held]);
         else {
-          if (pending && pending.kind === 'npc') {
+          if (pending && ['npc','guest'].includes(pending.kind)) {
             const live = W.objects(W.maps[app.state.player.map], app.state).find(o => o.id === pending.id);
             if (!live) app.stopWalking();
             else { pending = live; route = W.pathTo(app.state, live.x, live.y, true) || []; }

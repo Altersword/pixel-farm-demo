@@ -49,9 +49,10 @@
         html += Object.entries(D.crops).map(([id, crop]) => row(crop.name, `种子 ${s.seeds[id] || 0} 颗 · 生长 ${crop.growTime} 秒`, button(s.selectedSeed === id ? '已选' : '选择', 'seed', id), crop.color)).join('');
       } else if (openKind === 'bag') {
         title = '随身的小背包';
-        html = `<p class="panel-copy">收获可以出售，也可以留给订单。装饰品可摆在农场的空装饰位或空地块上。</p><p class="pill">木材 ${s.materials.wood} · 石料 ${s.materials.stone}</p>`;
+        html = `<p class="panel-copy">收获可以出售，也可以留给订单。装饰品可在农场摆放，也能带回小屋自由布置。</p><p class="pill">木材 ${s.materials.wood} · 石料 ${s.materials.stone}</p>`;
         html += Object.entries(s.inventory).filter(([, n]) => n > 0).map(([id, n]) => {
           const crop = D.crops[id], item = D.items[id];
+          if(item?.kind==='food')return row(item.name+' × '+n,'在小屋餐桌旁留给朋友，不出售。',button('上桌招待','serve',id,!s.hospitality.active||s.hospitality.active.served||s.player.map!=='home'));
           return row((crop || item).name + ' × ' + n, crop ? `出售 ${crop.sellPrice} 叶币 / 个` : item.kind === 'decor' ? '保留一份家的温度' : '食用或送出可换回部分叶币', button(crop ? '出售' : item.kind === 'decor' ? '摆放' : '使用', item && item.kind === 'decor' ? 'place' : 'sell', id), crop && crop.color);
         }).join('') || '<p class="empty">背包还空着，去种下第一颗种子吧。</p>';
         html += '<h3 class="side-title" style="margin-top:20px">种子口袋</h3><p class="panel-copy">' + Object.entries(D.crops).map(([id, c]) => c.name + ' ' + (s.seeds[id] || 0)).join(' · ') + '</p>';
@@ -77,6 +78,16 @@
         if(complete) html += '<p class="notice">已经记进手札。这里的风景会陪你继续生活。</p>';
         else if(!available) html += `<p class="panel-copy">等到${E.names[e.weather]}再来看看吧。今天${E.names[E.weather(s)]}，明天${E.names[E.weather(s,1)]}。回小屋休息就能迎接下一天。</p>`;
         else html += `<p class="panel-copy">${eventStep?'你已经完成了第一步，接下来……':'慢慢来，动手给森林留一点温柔。'}</p>${button(e.steps[eventStep], 'explore-step', e.id)}<p class="panel-copy">完成后收到 5 叶币；累计三个故事获得风铃，六个故事获得鸟屋。</p>`;
+      } else if(openKind==='stove'){
+        title='灶台上的小确幸';html='<p class="panel-copy">用自己的收获，做一份温暖。不需要计时，确认后即刻做好。</p>';
+        html+=Object.entries(D.dishes).map(([id,d])=>row(d.name,Object.entries(d.costs).map(([k,n])=>`${D.crops[k].name} ${s.inventory[k]||0}/${n}`).join(' · ')+`<br>已做 ${s.cooking.made[id]||0} 份 · ${D.neighbors.find(n=>n.id===d.favorite).name}最喜欢`,button('制作','cook',id,!Object.entries(d.costs).every(([k,n])=>(s.inventory[k]||0)>=n)),d.color)).join('');
+      } else if(openKind==='dining'){
+        title='给朋友留一张餐椅';const v=s.hospitality.active;
+        html='<p class="panel-copy">每次邀请一位已经认识的邻居，立即来访。每位朋友每天可获得一次料理好感：喜欢的料理 +2，其他料理 +1。</p>';
+        if(v){const n=D.neighbors.find(n=>n.id===v.neighbor);html+=`<p class="pill">${n.name}正在做客 · ${v.served?'已经用餐':'等你上菜'}</p><p class="dialogue-copy">「${root.ForestCooking.dialogue(s)}」</p>`;
+          if(!v.served)html+=Object.entries(D.dishes).map(([id,d])=>row(d.name,`拥有 ${s.inventory[id]||0} 份 · ${d.favorite===n.id?'最喜欢':'也会喜欢与你分享'}${s.hospitality.lastMealDay[n.id]===C.day(s)?'<br>今天已获得料理好感，本次不再加分':''}`,button('上桌','serve',id,!(s.inventory[id]>0)),d.color)).join('');
+          html+=button('送朋友回家','end-visit','',false,true);
+        }else html+=D.neighbors.map(n=>row(n.name,`${s.story.met.includes(n.id)?'已认识':'先去小镇打个招呼'} · 喜欢${Object.values(D.dishes).find(d=>d.favorite===n.id).name}${s.hospitality.hosted.includes(n.id)?' · 已招待':''}`,button('邀请做客','invite',n.id,!s.story.met.includes(n.id)))).join('');
       } else if (openKind === 'workbench') {
         title = '让双手做一点喜欢的东西';
         html = `<p class="panel-copy">材料来自风铃森林。每日可重新采集，也可以回小屋休息迎接新的一天。</p><p class="pill">木材 ${s.materials.wood} · 石料 ${s.materials.stone}</p>`;
@@ -96,7 +107,7 @@
       } else if (openKind === 'journal') {
         title = '森林生活手札'; const q=C.quest(s);
         html = `<div class="order-card"><span class="eyebrow">${q.complete?'A STORY THAT GOES ON':'A LETTER FOR YOU'}</span><h3>${q.title}</h3><p class="panel-copy">${q.desc}</p><p class="panel-copy">${q.progress}</p>${q.reward?button(`领取来信 · ${q.reward} 叶币`,'claim','',!q.done):''}</div><h3 class="side-title" style="margin-top:24px">邻居通讯录</h3>`;
-        html += D.neighbors.map(n=>{const location=N.whereabouts(s,n.id);return row(n.name+' · '+n.species,`${s.story.met.includes(n.id)?'已认识':'尚未见面'} · 好感 ${s.friends[n.id].points}<br>栗风小镇 · ${location.travelling?'正在前往':''}${location.name}`,button('去找'+n.name,'follow',n.id,false,true),n.color);}).join('');
+        html += D.neighbors.map(n=>{const location=N.whereabouts(s,n.id);return row(n.name+' · '+n.species,`${s.story.met.includes(n.id)?'已认识':'尚未见面'} · 好感 ${s.friends[n.id].points}<br>${W.maps[location.map].name} · ${location.travelling?'正在前往':''}${location.name}`,button('去找'+n.name,'follow',n.id,false,true),n.color);}).join('');
         html += `<h3 class="side-title" style="margin-top:24px">天气里的小故事 · ${s.exploration.completed.length}/6</h3><p class="panel-copy">三个故事：风的问候铃；六个故事：林间鸟屋。故事没有截止日期，也不影响聚会主线。</p>`;
         html += root.ForestExploration.events.map(e=>row(e.name,`${s.exploration.completed.includes(e.id)?'已完成':s.exploration.discovered.includes(e.id)?'已发现':'等待发现'} · ${E.names[e.weather]}<br>${W.maps[e.map].name} · ${e.hint}`,'')).join('');
         html += '<p class="panel-copy">小屋休息后，森林材料和聊天送礼次数会补充。作物按现实时间成长；可趁等待时探索、拜访和制作。地图点击可自动寻路，1/2/3 快速切换农具。</p>';
@@ -126,6 +137,10 @@
       if (action === 'claim') app.perform(() => C.claimQuest(s));
       if (action === 'festival') app.perform(() => C.festival(s));
       if (action === 'enter-home') { const result=app.perform(()=>C.enterHome(s));if(result.ok)close(); }
+      if(action==='cook')app.perform(()=>C.cook(s,id));
+      if(action==='invite')app.perform(()=>C.invite(s,id));
+      if(action==='serve')app.perform(()=>C.serve(s,id));
+      if(action==='end-visit')app.perform(()=>C.endVisit(s));
       if (action === 'craft-home') app.perform(()=>C.craftHome(s,id));
       if (action === 'craft') app.perform(() => C.craft(s, id));
       if (action === 'expand') app.perform(() => C.expand(s));

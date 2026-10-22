@@ -49,7 +49,7 @@
   // Every consumer resolves the same live objects; the base map stays immutable.
   function objects(map, state) {
     let result=root.ForestNeighbors&&state?[...map.objects.filter(o=>o.kind!=='npc'),...root.ForestNeighbors.objects(state,map.id)]:map.objects;
-    if(map.id==='home'&&state&&root.ForestHome)result=[...result,...root.ForestHome.furniture(state)];
+    if(map.id==='home'&&state&&root.ForestHome)result=[...result.filter(o=>!(o.kind==='seat'&&state.hospitality?.active)),...root.ForestHome.furniture(state),...(root.ForestCooking?root.ForestCooking.guest(state):[])];
     return result;
   }
   function objectAt(map, x, y, state) { return objects(map, state).find(o => x >= o.x && x < o.x + o.w && y >= o.y && y < o.y + o.h); }

@@ -31,7 +31,7 @@
       const snap = changedMap || s.settings.reducedMotion || width !== view.width || height !== view.height;
       const easing = snap ? 1 : 1 - Math.exp(-Math.min(100, Math.max(0, time - previousTime)) / 55);
       view = { x: view.x + (aimX - view.x) * easing, y: view.y + (aimY - view.y) * easing, tile: T, width, height };
-      latestView = { ...view, playerX: visual.x, playerY: visual.y, actors: W.objects(map,s).filter(o=>o.kind==='npc').map(o=>({...o})) }; previousTime = time;
+      latestView = { ...view, playerX: visual.x, playerY: visual.y, actors: W.objects(map,s).filter(o=>['npc','guest'].includes(o.kind)).map(o=>({...o})) }; previousTime = time;
       const px = x => x * T - view.x, py = y => y * T - view.y;
       for (let y = 0; y < W.H; y++) for (let x = 0; x < W.W; x++) {
         const type = map.tiles[y][x], hash = (x * 31 + y * 73) % 17, xx = px(x), yy = py(y);
@@ -106,11 +106,12 @@
           rect(x + w - 29, y - 32, 12, 22, '#927960'); rect(x + w - 32, y - 34, 18, 4, '#bfa988');
           sprites.furniture('flowerbox', x + 10, y + h - 30, 30);
           label(o.name, x + w / 2, y + h + 15);
-        } else if (o.kind === 'player' || o.kind === 'npc') {
+        } else if (o.kind === 'player' || o.kind === 'npc' || o.kind === 'guest') {
           const n = D.neighbors.find(n => n.id === o.id);
           const stride = !s.settings.reducedMotion && ((o.kind === 'player' && time < strideUntil) || o.moving) ? Math.floor(time / 90) % 2 : 0;
           sprites.character(o.id || 'player', x, y, T, o.facing || p.facing, stride);
           if (n) label(n.name, x + T / 2, y - 7);
+          if(o.kind==='guest'&&s.hospitality.active.served)sprites.furniture('meal',px(15.5),py(9),T);
         } else if (o.kind === 'festival') {
           rect(x+3,y+10,w-6,23,'#ae8a5c');rect(x+5,y+12,w-10,16,'#eddbad');
           for(let i=0;i<3;i++){rect(x+10+i*23,y+17,12,7,'#f8edcc');rect(x+13+i*23,y+19,5,3,['#ce765b','#93a160','#dda44e'][i]);}

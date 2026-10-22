@@ -45,10 +45,10 @@
  function objects(s,map){
   if(map!=='village')return[];
   const actors=runtime(s);
-  return D.neighbors.map(n=>{const a=actors[n.id],t=s.settings.reducedMotion?1:Math.min(1,a.age/200);
+  return D.neighbors.filter(n=>s.hospitality?.active?.neighbor!==n.id).map(n=>{const a=actors[n.id],t=s.settings.reducedMotion?1:Math.min(1,a.age/200);
    return{id:n.id,kind:'npc',name:n.name,x:a.x,y:a.y,w:1,h:1,facing:a.facing,visualX:a.fromX+(a.x-a.fromX)*t,visualY:a.fromY+(a.y-a.fromY)*t,moving:t<1};});
  }
- function whereabouts(s,id){const a=runtime(s)[id],d=destination(s,id);return {...d,x:a.x,y:a.y,travelling:a.x!==d.x||a.y!==d.y};}
+ function whereabouts(s,id){if(s.hospitality?.active?.neighbor===id)return{map:'home',name:'你的小屋做客',x:17,y:9,travelling:false};const a=runtime(s)[id],d=destination(s,id);return {...d,x:a.x,y:a.y,travelling:a.x!==d.x||a.y!==d.y};}
  function dialogue(s,id){const weather=E.weather(s);return lines[id][E.period(s)]+(weather==='rain'?' 下雨了，先在屋檐下躲一躲，心事也可以慢慢说。':weather==='mist'?' 雾会散开，熟悉的路一直都在。':' 今天的风很轻，适合出门遇见朋友。');}
  function reset(s){runtimes.delete(s);}
  root.ForestNeighbors={places,plans,destination,objects,update,whereabouts,dialogue,reset};
