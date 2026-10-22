@@ -1,0 +1,17 @@
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const { pathToFileURL }=require('node:url');const path=require('node:path');const fs=require('node:fs');const assert=require('node:assert/strict');
+const root=path.resolve(__dirname,'..');const output=process.env.FOREST_OUTPUT || path.join(root,'..','..','outputs');
+async function read(page){return page.evaluate(()=>JSON.parse(localStorage.getItem('pixel_farm_save')));}
+async function walk(page,x,y,adjacent=false){
+ const route=await page.evaluate(({x,y,adjacent})=>ForestWorld.pathTo(JSON.parse(localStorage.getItem('pixel_farm_save')),x,y,adjacent),{x,y,adjacent});assert.ok(route,'route exists');
+ for(const [dx,dy]of route){const before=(await read(page)).player;const key=dx<0?'ArrowLeft':dx>0?'ArrowRight':dy<0?'ArrowUp':'ArrowDown';await page.keyboard.down(key);await page.waitForFunction(p=>{const n=JSON.parse(localStorage.getItem('pixel_farm_save')).player;return n.x!==p.x||n.y!==p.y||n.map!==p.map},before,{timeout:3000});await page.keyboard.up(key);if((await read(page)).player.map!==before.map)break;}
+}
+async function clickTile(page,x,y){const p=(await read(page)).player;const r=await page.locator('#world').boundingBox();const t=r.width<500?34:42;const cx=Math.max(0,Math.min(28*t-r.width,p.x*t-r.width/2)),cy=Math.max(0,Math.min(20*t-r.height,p.y*t-r.height/2));await page.locator('#world').click({position:{x:(x+.5)*t-cx,y:(y+.5)*t-cy}});}
+(async()=>{const browser=await chromium.launch({headless:true,channel:'chrome'});try{fs.mkdirSync(output,{recursive:true});const page=await browser.newPage({viewport:{width:1440,height:980}});const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(pathToFileURL(path.join(root,'index.html')).href);await page.waitForFunction(()=>localStorage.getItem('pixel_farm_save'));
+ await walk(page,7,8,true);await clickTile(page,7,8);await page.waitForFunction(()=>JSON.parse(localStorage.getItem('pixel_farm_save')).plots[0].crop==='tomato');await page.keyboard.press('2');await clickTile(page,7,8);await page.waitForFunction(()=>JSON.parse(localStorage.getItem('pixel_farm_save')).plots[0].watered===true);
+ await walk(page,14,1);assert.equal((await read(page)).player.map,'forest');await walk(page,14,18);await walk(page,26,9);assert.equal((await read(page)).player.map,'village');
+ await walk(page,5,3,true);await clickTile(page,5,3);await page.waitForSelector('#panel[open]');assert.match(await page.locator('#panel-title').innerText(),/杂货铺/);await page.locator('[data-action=buyseed][data-id=tomato]').click();assert.equal((await read(page)).coins,95);await page.keyboard.press('Escape');
+ await walk(page,13,7,true);await clickTile(page,13,7);await page.waitForSelector('#panel[open]');assert.equal(await page.locator('[data-action=deliver]').isDisabled(),true);await page.keyboard.press('Escape');await page.reload();assert.equal((await read(page)).coins,95);assert.equal((await read(page)).player.map,'village');
+ await page.screenshot({path:path.join(output,'milestone-1-desktop.png'),fullPage:true});await page.setViewportSize({width:390,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:path.join(output,'milestone-1-mobile.png'),fullPage:true});
+ assert.deepEqual(errors,[]);console.log('PASS M1: file:// launch, real keyboard movement, crops, 3 maps, shop, orders, reload and mobile.');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

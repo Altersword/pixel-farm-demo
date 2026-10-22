@@ -1,122 +1,23 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
-
-const source = fs.readFileSync(path.join(__dirname, '..', 'game.js'), 'utf8');
-
-// Exercise the real game and storage flow with a minimal DOM, without timers.
-function boot(saved) {
-  const elements = new Map();
-  const element = () => ({
-    innerHTML: '', textContent: '', dataset: {}, style: {},
-    classList: { add() {}, remove() {}, toggle() {} },
-    addEventListener() {}, appendChild() {},
-  });
-  const storage = new Map(saved ? [['pixel_farm_save', JSON.stringify(saved)]] : []);
-  const context = vm.createContext({
-    document: {
-      querySelector(selector) {
-        if (!elements.has(selector)) elements.set(selector, element());
-        return elements.get(selector);
-      },
-      querySelectorAll: () => [], createElement: element,
-    },
-    localStorage: { getItem: key => storage.get(key) ?? null, setItem: (k, v) => storage.set(k, v) },
-    setTimeout() {}, setInterval() {}, clearTimeout() {},
-  });
-  vm.runInContext(source, context);
-  return {
-    run: code => vm.runInContext(code, context),
-    saved: () => JSON.parse(storage.get('pixel_farm_save')),
-  };
-}
-
-test('insufficient crops cannot consume inventory or grant a reward', () => {
-  const game = boot();
-  game.run('state.inventory.tomato = 1; deliverOrder()');
-  assert.equal(game.run('state.coins'), 100);
-  assert.equal(game.run('state.inventory.tomato'), 1);
-  assert.equal(game.run('state.ordersCompleted'), 0);
+const D = require('../js/data.js');
+const C = require('../js/model.js');
+const W = require('../js/world.js');
+const S = require('../js/storage.js');
+const memory = () => { const data = new Map(); return { getItem: k => data.get(k) ?? null, setItem: (k,v) => data.set(k,v) }; };
+test('harvesting and order delivery consume crops and preserve seed income', () => {
+ const s=C.newGame(), now=100000;
+ for(let i=0;i<2;i++){assert.ok(C.farm(s,i,now).ok);s.tool='water';assert.ok(C.farm(s,i,now).ok);s.tool='plant';}
+ s.tool='harvest';assert.equal(C.farm(s,0,now+20000).ok,false);
+ assert.ok(C.farm(s,0,now+22000,()=>0).ok);assert.ok(C.farm(s,1,now+22000,()=>0).ok);
+ assert.equal(s.seeds.tomato,5);assert.ok(C.deliver(s).ok);assert.equal(s.coins,130);assert.equal(s.inventory.tomato,0);assert.equal(s.ordersCompleted,1);
 });
-
-test('delivery consumes only required crops, pays premium and saves next order', () => {
-  const game = boot();
-  game.run('state.inventory = { tomato: 3, carrot: 7 }; deliverOrder()');
-  const saved = game.saved();
-  assert.deepEqual(saved.inventory, { tomato: 1, carrot: 7 });
-  assert.equal(saved.coins, 130);
-  assert.equal(saved.ordersCompleted, 1);
-  assert.equal(game.run('currentOrder().name'), '松鼠的野餐');
-  game.run('deliverOrder()');
-  assert.equal(game.run('state.coins'), 130);
-});
-
-test('reload preserves completed order and does not replay rewards', () => {
-  const game = boot();
-  game.run('state.inventory.tomato = 2; deliverOrder()');
-  const reloaded = boot(game.saved());
-  assert.equal(reloaded.run('state.ordersCompleted'), 1);
-  reloaded.run('deliverOrder()');
-  assert.equal(reloaded.run('state.coins'), 130);
-});
-
-test('all six orders pay 50% extra and rotate back after a full round', () => {
-  const game = boot();
-  game.run(`
-    globalThis.expectedCoins = 100;
-    for (let i = 0; i < ORDERS.length; i++) {
-      const order = currentOrder();
-      const base = Object.entries(order.wants).reduce((s, [key, n]) => s + CROPS[key].sellPrice * n, 0);
-      if (orderReward(order) !== Math.ceil(base * 1.5)) throw new Error('Bad premium');
-      expectedCoins += orderReward(order);
-      state.inventory = { ...order.wants };
-      deliverOrder();
-    }
-  `);
-  assert.equal(game.run('state.coins'), game.run('expectedCoins'));
-  assert.equal(game.run('state.ordersCompleted'), 6);
-  assert.equal(game.run('currentOrder().name'), '兔兔的早餐');
-});
-
-test('legacy save keeps zero and one seeds, fills only absent crop kinds', () => {
-  const original = boot().saved();
-  original.seeds = { tomato: 0, carrot: 1 };
-  delete original.ordersCompleted;
-  const game = boot(original);
-  assert.deepEqual(game.saved().seeds, { tomato: 0, carrot: 1, corn: 2, strawberry: 2, watermelon: 2 });
-  assert.equal(game.saved().ordersCompleted, 0);
-});
-
-test('plant, water, grow, harvest and deliver work together', () => {
-  const game = boot();
-  game.run(`
-    handlePlotClick(0); handlePlotClick(1);
-    state.tool = 'water'; handlePlotClick(0); handlePlotClick(1);
-    state.plots[0].plantedAt = Date.now() - 22000;
-    state.plots[1].plantedAt = Date.now() - 22000;
-    growthTick();
-    state.tool = 'harvest'; handlePlotClick(0); handlePlotClick(1);
-    deliverOrder();
-  `);
-  assert.equal(game.saved().coins, 130);
-  assert.equal(game.saved().ordersCompleted, 1);
-  assert.equal(game.saved().inventory.tomato, 0);
-  assert.equal(game.saved().plots[0].crop, null);
-});
-
-test('removing a decoration is immediately persisted', () => {
-  const game = boot();
-  game.run("state.plots[0].decoration = '🪴'; handlePlotClick(0)");
-  assert.equal(game.saved().plots[0].decoration, null);
-  assert.equal(game.saved().inventory.flower_pot, 1);
-});
-
-test('invalid order counters in old saves start at the first order', () => {
-  for (const invalid of [-1, 0.5, '2', null]) {
-    const original = boot().saved();
-    original.ordersCompleted = invalid;
-    assert.equal(boot(original).saved().ordersCompleted, 0);
-  }
-});
+test('shortages cannot award money or consume items',()=>{const s=C.newGame();s.inventory.tomato=1;const before=JSON.stringify(s);assert.equal(C.deliver(s).ok,false);assert.equal(JSON.stringify(s),before);});
+test('orders rotate after six and retain their 50 percent premium',()=>{const s=C.newGame();for(let i=0;i<6;i++){const o=C.currentOrder(s);s.inventory={...o.wants};const amount=C.reward(o);const coins=s.coins;C.deliver(s);assert.equal(s.coins-coins,amount);}assert.equal(C.currentOrder(s).neighbor,'rabbit');});
+test('legacy migration preserves 0 and 1 seeds, plots, currency and orders',()=>{const s=C.newGame();delete s.version;s.seeds={tomato:0,carrot:1};s.coins=321;s.ordersCompleted=8;s.plots[0].decoration='🪴';const m=C.migrate(s);assert.equal(m.coins,321);assert.equal(m.ordersCompleted,8);assert.equal(m.seeds.tomato,0);assert.equal(m.seeds.carrot,1);assert.equal(m.seeds.corn,2);assert.equal(m.plots[0].decoration,'flower_pot');});
+test('import rejects malformed data before replacing storage',()=>{const mem=memory(),store=S.create(mem),s=C.newGame();store.save(s);const before=store.raw();for(const invalid of ['null','[]','{',JSON.stringify({...s,coins:-1}),JSON.stringify({...s,version:999})])assert.throws(()=>store.import(invalid));assert.equal(store.raw(),before);});
+test('migration backs up old data and damaged saves stay protected',()=>{const mem=memory(),store=S.create(mem),s=C.newGame();delete s.version;mem.setItem(S.key,JSON.stringify(s));assert.equal(store.load().state.version,2);assert.equal(mem.getItem(S.key+'_legacy_backup'),JSON.stringify(s));mem.setItem(S.key,'broken');assert.equal(store.load().protected,true);assert.equal(store.raw(),'broken');});
+test('export/import round trip retains inventory, progress and position',()=>{const store=S.create(memory()),s=C.newGame();s.player={map:'village',x:12,y:11,facing:'up'};s.inventory.corn=17;s.ordersCompleted=7;assert.deepEqual(store.import(store.export(s)),s);});
+test('water and houses block movement',()=>{const s=C.newGame();s.player={map:'farm',x:20,y:14,facing:'right'};assert.equal(W.move(s,1,0),false);s.player={map:'farm',x:3,y:6,facing:'up'};assert.equal(W.move(s,0,-1),false);});
+test('all portals and interactive objects have accessible routes',()=>{for(const map of Object.values(W.maps)){const s=C.newGame();s.player={map:map.id,x:14,y:9,facing:'down'};for(const gate of map.portals)assert.ok(W.pathTo(s,gate.x,gate.y),map.id+' '+gate.label);for(const o of map.objects)assert.ok(W.pathTo(s,o.x,o.y,true),map.id+' '+o.id);}});
+test('walking through portals updates visited places and returns safely',()=>{const s=C.newGame();for(const [map,x,y,dx,dy,to] of [['farm',25,9,1,0,'village'],['village',2,9,-1,0,'farm'],['farm',14,2,0,-1,'forest'],['forest',14,17,0,1,'farm']]){s.player={map,x,y,facing:'up'};assert.ok(W.move(s,dx,dy));assert.equal(s.player.map,to);}assert.deepEqual(s.world.visited,['farm','village','forest']);});
