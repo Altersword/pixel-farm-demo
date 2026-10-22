@@ -5,7 +5,7 @@
   const esc = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   function create(app) {
     const panel = $('#panel'), content = $('#panel-content');
-    let openKind = '', context = null, toastTimer;
+    let openKind = '', context = null, toastTimer, lastHTML = '';
     const button = (label, action, id = '', disabled = false, secondary = false) => `<button class="btn${secondary ? ' secondary' : ''}" data-action="${action}" data-id="${id}" ${disabled ? 'disabled' : ''}>${label}</button>`;
     function row(name, desc, actions, color = '#b9c69b') { return `<div class="item-row"><span class="swatch" style="--item-color:${color}"></span><div class="item-body"><h3>${esc(name)}</h3><p>${desc}</p></div>${actions}</div>`; }
     function toast(text) { clearTimeout(toastTimer); $('#scene-toast').textContent = text; $('#scene-toast').classList.add('show'); toastTimer = setTimeout(() => $('#scene-toast').classList.remove('show'), 3300); }
@@ -61,7 +61,12 @@
       } else {
         title = context ? context.name : '林间的一角'; html = '<p class="panel-copy">这里的故事还在慢慢生长。先到森林与小镇看看，或者回农田种下新作物。</p>';
       }
-      $('#panel-title').textContent = title; content.innerHTML = html;
+      $('#panel-title').textContent = title;
+      if (lastHTML !== html) {
+        const active = document.activeElement, action = active && active.dataset.action, id = active && active.dataset.id;
+        const scroll = panel.scrollTop; content.innerHTML = html; lastHTML = html; panel.scrollTop = scroll;
+        if (action) { const next = Array.from(content.querySelectorAll('[data-action]')).find(n => n.dataset.action === action && n.dataset.id === id); if (next) next.focus({ preventScroll: true }); }
+      }
     }
     document.addEventListener('click', e => {
       const menu = e.target.closest('[data-menu]'); if (menu) open(menu.dataset.menu);

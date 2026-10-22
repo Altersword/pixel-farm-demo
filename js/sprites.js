@@ -1,0 +1,66 @@
+/* Original code-drawn pixel sprites. No network fonts or external art assets. */
+(function (root) {
+  'use strict';
+  function create(ctx) {
+    function at(x, y, size, fn) {
+      ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(size / 24, size / 24);
+      const r = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
+      fn(r); ctx.restore();
+    }
+    function tree(x, y, size) {
+      at(x - size * .25, y - size * .7, size * 1.5, r => {
+        r(8, 20, 9, 3, '#516e4a'); r(11, 12, 3, 10, '#796046'); r(13, 13, 2, 9, '#9a7950');
+        r(4, 10, 17, 7, '#41684b'); r(2, 8, 19, 5, '#48724f'); r(5, 4, 15, 8, '#588256');
+        r(8, 1, 9, 10, '#638d59'); r(6, 5, 6, 5, '#729d63'); r(10, 1, 5, 6, '#84a96e');
+        r(5, 12, 3, 2, '#527d51'); r(16, 8, 3, 2, '#416c4c'); r(10, 16, 6, 2, '#3d6248');
+      });
+    }
+    function crop(id, progress, x, y, size) {
+      at(x, y, size, r => {
+        if (progress < 35) { r(11, 13, 2, 6, '#547a43'); r(7, 12, 5, 3, '#9abd6c'); r(13, 10, 5, 4, '#7fa65a'); return; }
+        r(11, 9, 2, 12, '#507442'); r(5, 11, 7, 4, '#86a45c'); r(13, 7, 7, 4, '#a1bb6c');
+        if (progress < 100) { r(8, 6, 5, 5, '#7f9b51'); r(13, 13, 6, 4, '#688a46'); return; }
+        if (id === 'tomato') { r(6, 11, 12, 8, '#be5147'); r(8, 9, 8, 12, '#d96a52'); r(9, 10, 3, 3, '#ed9671'); r(10, 8, 5, 3, '#6c8d49'); }
+        if (id === 'carrot') { r(9, 8, 7, 8, '#e6a252'); r(10, 16, 5, 3, '#d78643'); r(11, 19, 3, 3, '#c4773c'); r(8, 5, 3, 4, '#7a9c57'); r(13, 3, 3, 6, '#a1b969'); r(9, 12, 4, 1, '#f1bf6c'); }
+        if (id === 'corn') { r(8, 7, 8, 13, '#dfb853'); r(10, 5, 5, 16, '#efd37c'); for (let yy = 8; yy < 20; yy += 3) r(9, yy, 6, 1, '#cda04b'); r(6, 14, 3, 8, '#648548'); r(16, 12, 3, 9, '#8caa5e'); }
+        if (id === 'strawberry') { r(6, 10, 13, 6, '#c35364'); r(8, 16, 9, 3, '#d36672'); r(10, 19, 5, 2, '#ba4c60'); r(7, 8, 11, 3, '#759649'); for (const [a,b] of [[9,12],[14,12],[11,16],[16,15]]) r(a,b,1,1,'#f8d899'); }
+        if (id === 'watermelon') { r(4, 11, 17, 8, '#557f4b'); r(6, 9, 13, 12, '#90aa5c'); r(8, 10, 2, 10, '#557c46'); r(13, 9, 2, 12, '#648a49'); r(18, 12, 2, 6, '#557c46'); r(9, 10, 3, 2, '#c1cd83'); }
+      });
+    }
+    function character(id, x, y, size, facing = 'down', step = 0) {
+      at(x, y - size * .15, size * 1.12, r => {
+        const n = root.ForestData.neighbors.find(n => n.id === id), fur = n ? n.color : '#e6c9a6';
+        const shade = { rabbit: '#c5ad9d', squirrel: '#915e42', bear: '#97764f', hippo: '#7c899b', fox: '#b76e48', owl: '#706582' }[id];
+        r(5, 21, 14, 2, '#647c523f');
+        if (id === 'squirrel') { r(18, 8, 5, 11, '#956342'); r(19, 5, 4, 9, '#bd875a'); r(20, 6, 2, 5, '#d3a16d'); }
+        if (id === 'fox') { r(18, 14, 5, 5, '#bc744b'); r(21, 14, 3, 3, '#f0dbc0'); }
+        r(7 + step, 20, 4, 3, n ? shade : '#67543f'); r(14 - step, 20, 4, 3, n ? shade : '#67543f');
+        r(6, 13, 13, 8, n ? '#b1b58c' : '#5e7e78'); r(5, 15, 3, 5, fur); r(18, 15, 3, 5, fur);
+        r(7, 5, 12, 10, fur); r(5, 7, 16, 6, fur); r(8, 14, 10, 2, n ? shade : '#d4b18a');
+        if (n) {
+          if (id === 'rabbit') { r(7, 0, 4, 8, fur); r(15, 0, 4, 8, fur); r(8, 1, 2, 5, '#cd9d97'); r(16, 1, 2, 5, '#cd9d97'); }
+          else if (id === 'owl') { r(6, 3, 4, 5, fur); r(16, 3, 4, 5, fur); r(7, 8, 6, 5, '#e2d5b3'); r(14, 8, 6, 5, '#e2d5b3'); r(12, 12, 2, 2, '#d9ac63'); }
+          else if (id === 'hippo') { r(5, 4, 4, 4, fur); r(17, 4, 4, 4, fur); r(6, 11, 14, 5, '#b1b5be'); r(8, 12, 2, 1, shade); r(17, 12, 2, 1, shade); }
+          else { r(5, 3, 5, 5, fur); r(16, 3, 5, 5, fur); r(6, 4, 2, 2, shade); r(18, 4, 2, 2, shade); r(9, 11, 8, 4, '#e5cfaa'); }
+          r(8, 18, 3, 2, '#e7d4ad');
+        } else { r(5, 4, 17, 3, '#bd995f'); r(8, 0, 11, 5, '#e2c58a'); r(8, 4, 11, 1, '#9c8156'); r(10, 17, 7, 4, '#c4b79b'); }
+        if (facing !== 'up' || n) {
+          r(facing === 'left' ? 8 : 9, 9, 2, 2, '#3e493b'); if (facing !== 'left') r(16, 9, 2, 2, '#3e493b');
+          r(11, 12, 3, 1, '#9b7460'); if (id !== 'hippo') { r(7, 11, 2, 1, '#d59c8a'); r(18, 11, 2, 1, '#d59c8a'); }
+        }
+      });
+    }
+    function furniture(id, x, y, size) {
+      at(x, y, size, r => {
+        if (id === 'lamp') { r(11, 7, 3, 16, '#695d45'); r(8, 21, 9, 2, '#8d7c59'); r(7, 3, 11, 3, '#66734a'); r(8, 6, 9, 7, '#e7c976'); r(10, 7, 5, 4, '#ffebb0'); r(7, 12, 11, 2, '#65704c'); r(11, 0, 3, 3, '#65704c'); }
+        else if (id === 'bench') { r(3, 7, 18, 3, '#b39160'); r(3, 11, 18, 3, '#c6a36b'); r(2, 15, 20, 3, '#9d7c52'); r(4, 18, 3, 5, '#715f43'); r(17, 18, 3, 5, '#715f43'); }
+        else if (id === 'fence') { for (let a=3;a<22;a+=7)r(a,7,3,16,'#c7b184'); r(2,10,20,3,'#e5cda0'); r(2,17,20,3,'#d7bd8d'); }
+        else if (id === 'windmill') { r(10, 10, 5, 13, '#bc9b6e'); r(12, 1, 2, 19, '#e4d4aa'); r(3, 10, 19, 2, '#e4d4aa'); r(3, 7, 6, 3, '#e3c58d'); r(14, 2, 3, 6, '#e3c58d'); r(16, 12, 6, 3, '#e3c58d'); r(9, 14, 3, 6, '#e3c58d'); r(11, 9, 4, 4, '#8b7653'); }
+        else if (id === 'scarecrow') { r(11, 10, 3, 13, '#816347'); r(4, 11, 18, 3, '#a47d55'); r(8, 4, 10, 8, '#d3b17d'); r(5, 3, 16, 2, '#ae8c52'); r(9, 0, 8, 4, '#d5b66f'); r(9, 11, 8, 7, '#bb8064'); r(10, 7, 1, 1, '#604e3b'); r(15, 7, 1, 1, '#604e3b'); }
+        else { r(3, 14, 19, 8, '#ab7958'); r(2, 13, 21, 3, '#ca9b70'); r(5, 17, 2, 4, '#c9996e'); for(const [a,b]of [[6,8],[12,5],[18,8]]){r(a, b+3,2,5,'#6f8d50');r(a-2,b,6,4,a===12?'#dfbd74':'#d39a96');r(a,b+1,2,2,'#efdbad');} }
+      });
+    }
+    return { tree, crop, character, furniture };
+  }
+  root.ForestSprites = { create };
+})(globalThis);

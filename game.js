@@ -4,6 +4,7 @@
   const C = ForestCore, W = ForestWorld, D = ForestData;
   const canvas = document.querySelector('#world');
   const storage = ForestStorage.create(localStorage), loaded = storage.load();
+  const audio = ForestAudio.create();
   const app = {
     state: loaded.state, protected: !!loaded.protected, canvas,
     stopWalking() { route = []; pending = null; held = ''; },
@@ -12,8 +13,8 @@
       try { storage.save(app.state); document.querySelector('#save-status').textContent = '已保存在此浏览器'; }
       catch (_) { document.querySelector('#save-status').textContent = '保存失败，请在设置中导出备份'; }
     },
-    perform(action) { const result = action(); if (result.ok) app.save(); ui.toast(result.message); ui.refresh(); return result; },
-    applySettings() { document.body.classList.toggle('reduced-motion', app.state.settings.reducedMotion); },
+    perform(action) { const result = action(); if (result.ok) app.save(); audio.effect(result.ok); ui.toast(result.message); ui.refresh(); return result; },
+    applySettings() { document.body.classList.toggle('reduced-motion', app.state.settings.reducedMotion); audio.set(app.state.settings.mute).catch(() => ui.toast('声音暂时无法启用，游戏仍可正常游玩。')); },
     download(raw = false) {
       const data = raw ? storage.raw() : storage.export(app.state);
       if (!data) { ui.toast('还没有原始存档。'); return; }
@@ -61,6 +62,7 @@
   });
   document.addEventListener('keyup', e => { if (keys[e.key] === held) held = ''; });
   window.addEventListener('blur', () => app.stopWalking());
+  document.addEventListener('pointerdown', () => { if (!app.state.settings.mute) audio.set(false).catch(() => {}); }, { once: true });
   for (const button of document.querySelectorAll('[data-dir]')) {
     button.addEventListener('pointerdown', e => { e.preventDefault(); button.setPointerCapture(e.pointerId); app.stopWalking(); held = button.dataset.dir; });
     button.addEventListener('pointerup', () => { held = ''; }); button.addEventListener('pointercancel', () => { held = ''; }); button.addEventListener('lostpointercapture', () => { held = ''; });
@@ -94,6 +96,7 @@
     if (time - lastGrowth > 1000) { C.grow(app.state); ui.refresh(); lastGrowth = time; }
     if (time - lastSave > 5000) { app.save(); lastSave = time; }
     art.draw(app.state, time);
+    audio.scene(app.state.player.map, app.state.world.elapsed % D.dayLength / D.dayLength > .75);
     requestAnimationFrame(frame);
   }
   document.addEventListener('visibilitychange', () => { lastFrame = 0; app.stopWalking(); app.save(); });
