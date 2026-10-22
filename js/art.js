@@ -26,8 +26,10 @@
       lastPlayer = { x: p.x, y: p.y, map: p.map };
       const phase = s.world.elapsed % D.dayLength / D.dayLength;
       const darkness = phase < .55 ? 0 : phase < .75 ? (phase - .55) * 1.7 : .34;
-      const aimX = Math.max(0, Math.min(W.W * T - width, (placement?placement.x:visual.x) * T - width / 2));
-      const aimY = Math.max(0, Math.min(W.H * T - height, (placement?placement.y:visual.y) * T - height / 2));
+      const anchorX=map.id==='home'&&width>=16*T?14:placement?placement.x:visual.x;
+      const anchorY=map.id==='home'&&height>=12*T?10:placement?placement.y:visual.y;
+      const aimX = Math.max(0, Math.min(W.W * T - width, anchorX * T - width / 2));
+      const aimY = Math.max(0, Math.min(W.H * T - height, anchorY * T - height / 2));
       const snap = changedMap || s.settings.reducedMotion || width !== view.width || height !== view.height;
       const easing = snap ? 1 : 1 - Math.exp(-Math.min(100, Math.max(0, time - previousTime)) / 55);
       view = { x: view.x + (aimX - view.x) * easing, y: view.y + (aimY - view.y) * easing, tile: T, width, height };
@@ -126,7 +128,10 @@
       }
       for (const gate of map.portals) { const x = px(gate.x), y = py(gate.y); rect(x + 7, y + 5, T - 14, T - 10, '#e5dbb9'); label(gate.label, x + T / 2, y - 8); }
       if(map.id==='home'){
-        for(const wx of [10,17]){const xx=px(wx),yy=py(4);rect(xx,yy-12,T*2,36,'#795f48');rect(xx+4,yy-8,T*2-8,28,phase>.75?'#6c8090':'#b7d0c0');rect(xx+T-2,yy-8,4,28,'#e6d1a5');rect(xx+4,yy+6,T*2-8,3,'#e6d1a5');}
+        const windowWeather=root.ForestEnvironment.weather(s);
+        for(const wx of [10,17]){const xx=px(wx),yy=py(4);rect(xx,yy-12,T*2,36,'#795f48');rect(xx+4,yy-8,T*2-8,28,phase>.75?'#6c8090':windowWeather==='rain'?'#93adb2':windowWeather==='mist'?'#d5d5bf':'#b7d0c0');rect(xx+T-2,yy-8,4,28,'#e6d1a5');rect(xx+4,yy+6,T*2-8,3,'#e6d1a5');if(windowWeather==='rain'&&!s.settings.reducedMotion)for(let i=0;i<4;i++)rect(xx+10+i*15,yy-6+(time*.03+i*5)%18,1,4,'#e3ece4');}
+        sprites.furniture('lamp',px(6),py(9),T);
+        if(phase>.75){ctx.fillStyle='#f2c97a0d';ctx.fillRect(0,0,width,height);}
         rect(px(12),py(8),T*2,T*3,'#c6977c55');
       }
       if (darkness && map.id!=='home') { ctx.fillStyle = `rgba(30,48,77,${darkness})`; ctx.fillRect(0, 0, width, height); }

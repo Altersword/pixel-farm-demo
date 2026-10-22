@@ -13,7 +13,7 @@
     }
     function tick() {
       if (!enabled || document.hidden) return;
-      note(notes[index++ % notes.length] * (night || weather === 'mist' ? .5 : 1), 1.4, .055);
+      note(notes[index++ % notes.length] * (night || weather === 'mist' || map === 'home' ? .5 : 1), 1.4, .055);
       if (weather === 'rain') note(120 + (index % 5) * 37, .12, .012, 'triangle');
       if (index % 4 === 0) note((map === 'forest' ? 1174.66 : 987.77), .18, .025);
       if (index % 8 === 0) note(notes[(index + 2) % notes.length] / 2, 2.3, .04, 'triangle');
@@ -29,7 +29,7 @@
       await context.resume(); if (!timer) { tick(); timer = setInterval(tick, 1800); }
     }
     document.addEventListener('visibilitychange', () => { if (!context) return; if (document.hidden) context.suspend(); else if (enabled) context.resume().catch(() => {}); });
-    return { set, scene(id, isNight, currentWeather) { map = id; night = isNight; weather = currentWeather; }, effect(success) { if (enabled) note(success ? 659.25 : 220, .16, .065, 'triangle'); } };
+    return { set, scene(id, isNight, currentWeather) { map = id; night = isNight; weather = id==='home'?'indoor':currentWeather; }, effect(success) { if (enabled) note(success ? 659.25 : 220, .16, .065, 'triangle'); } };
   }
   root.ForestAudio = { create };
 })(globalThis);

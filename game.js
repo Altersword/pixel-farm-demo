@@ -157,7 +157,7 @@
   document.addEventListener('visibilitychange', () => { lastFrame = 0; app.stopWalking(); app.save(); });
   window.addEventListener('pagehide', () => app.save());
   validatePosition(); C.grow(app.state); E.irrigate(app.state); app.applySettings(); ui.refresh(); app.save();
-  if (loaded.error) ui.toast(loaded.error); else ui.toast('欢迎回家。向北是森林，向东是小镇。');
+  if (loaded.error) ui.toast(loaded.error); else ui.toast(app.state.player.map==='home'?'欢迎回家。灶台做饭，餐桌会客，南边门口回农场。':'欢迎回家。向北是森林，向东是小镇。');
   if (!loaded.error && !app.state.settings.onboardingSeen) ui.open('welcome');
   requestAnimationFrame(frame);
 })();
