@@ -5,6 +5,7 @@ const C = require('../js/model.js');
 require('../js/story.js');
 require('../js/activities.js');
 const W = require('../js/world.js');
+require('../js/environment.js');require('../js/neighbors.js');require('../js/exploration.js');
 const S = require('../js/storage.js');
 require('../js/story.js');
 const memory = () => { const data = new Map(); return { getItem: k => data.get(k) ?? null, setItem: (k,v) => data.set(k,v) }; };
@@ -19,7 +20,7 @@ test('shortages cannot award money or consume items',()=>{const s=C.newGame();s.
 test('orders rotate after six and retain their 50 percent premium',()=>{const s=C.newGame();for(let i=0;i<6;i++){const o=C.currentOrder(s);s.inventory={...o.wants};const amount=C.reward(o);const coins=s.coins;C.deliver(s);assert.equal(s.coins-coins,amount);}assert.equal(C.currentOrder(s).neighbor,'rabbit');});
 test('legacy migration preserves 0 and 1 seeds, plots, currency and orders',()=>{const s=C.newGame();delete s.version;s.seeds={tomato:0,carrot:1};s.coins=321;s.ordersCompleted=8;s.plots[0].decoration='🪴';const m=C.migrate(s);assert.equal(m.coins,321);assert.equal(m.ordersCompleted,8);assert.equal(m.seeds.tomato,0);assert.equal(m.seeds.carrot,1);assert.equal(m.seeds.corn,2);assert.equal(m.plots[0].decoration,'flower_pot');});
 test('import rejects malformed data before replacing storage',()=>{const mem=memory(),store=S.create(mem),s=C.newGame();store.save(s);const before=store.raw();for(const invalid of ['null','[]','{',JSON.stringify({...s,coins:-1}),JSON.stringify({...s,version:999})])assert.throws(()=>store.import(invalid));assert.equal(store.raw(),before);});
-test('migration backs up old data and damaged saves stay protected',()=>{const mem=memory(),store=S.create(mem),s=C.newGame();delete s.version;mem.setItem(S.key,JSON.stringify(s));assert.equal(store.load().state.version,2);assert.equal(mem.getItem(S.key+'_legacy_backup'),JSON.stringify(s));mem.setItem(S.key,'broken');assert.equal(store.load().protected,true);assert.equal(store.raw(),'broken');});
+test('migration backs up old data and damaged saves stay protected',()=>{const mem=memory(),store=S.create(mem),s=C.newGame();delete s.version;mem.setItem(S.key,JSON.stringify(s));assert.equal(store.load().state.version,3);assert.equal(mem.getItem(S.key+'_legacy_backup'),JSON.stringify(s));mem.setItem(S.key,'broken');assert.equal(store.load().protected,true);assert.equal(store.raw(),'broken');});
 test('export/import round trip retains inventory, progress and position',()=>{const store=S.create(memory()),s=C.newGame();s.player={map:'village',x:12,y:11,facing:'up'};s.inventory.corn=17;s.ordersCompleted=7;assert.deepEqual(store.import(store.export(s)),s);});
 test('water and houses block movement',()=>{const s=C.newGame();s.player={map:'farm',x:20,y:14,facing:'right'};assert.equal(W.move(s,1,0),false);s.player={map:'farm',x:3,y:6,facing:'up'};assert.equal(W.move(s,0,-1),false);});
 test('all portals and interactive objects have accessible routes',()=>{for(const map of Object.values(W.maps)){const s=C.newGame();s.player={map:map.id,x:14,y:9,facing:'down'};for(const gate of map.portals)assert.ok(W.pathTo(s,gate.x,gate.y),map.id+' '+gate.label);for(const o of map.objects)assert.ok(W.pathTo(s,o.x,o.y,true),map.id+' '+o.id);}});

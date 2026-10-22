@@ -38,6 +38,7 @@
     if (object) object = W.objects(W.maps[app.state.player.map], app.state).find(o => o.id === object.id);
     if (!object || !W.near(app.state.player, object)) { ui.toast('走近一点，就能和这里的生活打招呼。'); return; }
     app.stopWalking();
+    if (object.kind === 'exploration') { app.perform(() => ForestExploration.discover(app.state, object.id)); ui.open('exploration', object); return; }
     if (object.kind === 'plot') { app.perform(() => C.farm(app.state, Number(object.id.slice(5)))); return; }
     if (object.kind === 'resource') { app.perform(() => C.gather(app.state, object.id)); return; }
     if (object.kind === 'treasure') { app.perform(() => C.discover(app.state, object.id)); return; }
@@ -65,9 +66,9 @@
   canvas.addEventListener('click', event => {
     if (ui.isOpen) return;
     canvas.focus({ preventScroll: true });
-    const pos = art.tileAt(event.clientX, event.clientY), map = W.maps[app.state.player.map];
-    const object = W.objectAt(map, pos.x, pos.y, app.state);
-    const next = W.pathTo(app.state, pos.x, pos.y, !!object);
+    const pos = art.pointAt(event.clientX, event.clientY), map = W.maps[app.state.player.map];
+    const object = W.hitTest(map, pos.x, pos.y, app.state);
+    const next = W.pathTo(app.state, object?object.x:Math.floor(pos.x), object?object.y:Math.floor(pos.y), !!object);
     if (!next) { ui.toast('那边暂时走不过去，换条小路吧。'); return; }
     app.stopWalking(); route = next; pending = object;
     if (!route.length && pending) interact(pending);

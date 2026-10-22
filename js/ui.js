@@ -5,7 +5,7 @@
   const esc = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   function create(app) {
     const panel = $('#panel'), content = $('#panel-content');
-    let openKind = '', context = null, toastTimer, lastHTML = '';
+    let openKind = '', context = null, toastTimer, lastHTML = '', eventStep = 0;
     const button = (label, action, id = '', disabled = false, secondary = false) => `<button class="btn${secondary ? ' secondary' : ''}" data-action="${action}" data-id="${id}" ${disabled ? 'disabled' : ''}>${label}</button>`;
     const mini = root.ForestActivitiesUI.create(app, { toast, refresh });
     function row(name, desc, actions, color = '#b9c69b') { return `<div class="item-row"><span class="swatch" style="--item-color:${color}"></span><div class="item-body"><h3>${esc(name)}</h3><p>${desc}</p></div>${actions}</div>`; }
@@ -31,7 +31,7 @@
       if (panel.open) render();
     }
     function open(kind, data = null) {
-      openKind = kind; context = data; $('#panel-notice').hidden = true; app.stopWalking();
+      openKind = kind; context = data; eventStep = 0; $('#panel-notice').hidden = true; app.stopWalking();
       if (kind === 'activity') mini.start(data.id);
       render();
       if (!panel.open) panel.showModal();
@@ -69,6 +69,13 @@
         html += `<div class="btn-row">${button(s.story.activities[n.id]?'聚会心意已备好':'一起准备一份聚会心意','activity-open',n.id)}</div>`;
       } else if (openKind === 'activity') {
         title = D.activities[context.id].title; html = mini.render(context.id);
+      } else if (openKind === 'exploration') {
+        const e = root.ForestExploration.get(context.id), complete=s.exploration.completed.includes(e.id), available=E.weather(s)===e.weather;
+        title = e.name;
+        html = `<p class="pill">${E.names[e.weather]}的小故事 · ${e.hint}</p><p class="dialogue-copy">「${complete?e.after:e.intro}」</p>`;
+        if(complete) html += '<p class="notice">已经记进手札。这里的风景会陪你继续生活。</p>';
+        else if(!available) html += `<p class="panel-copy">等到${E.names[e.weather]}再来看看吧。今天${E.names[E.weather(s)]}，明天${E.names[E.weather(s,1)]}。回小屋休息就能迎接下一天。</p>`;
+        else html += `<p class="panel-copy">${eventStep?'你已经完成了第一步，接下来……':'慢慢来，动手给森林留一点温柔。'}</p>${button(e.steps[eventStep], 'explore-step', e.id)}<p class="panel-copy">完成后收到 5 叶币；累计三个故事获得风铃，六个故事获得鸟屋。</p>`;
       } else if (openKind === 'workbench') {
         title = '让双手做一点喜欢的东西';
         html = `<p class="panel-copy">材料来自风铃森林。每日可重新采集，也可以回小屋休息迎接新的一天。</p><p class="pill">木材 ${s.materials.wood} · 石料 ${s.materials.stone}</p>`;
@@ -87,6 +94,8 @@
         title = '森林生活手札'; const q=C.quest(s);
         html = `<div class="order-card"><span class="eyebrow">${q.complete?'A STORY THAT GOES ON':'A LETTER FOR YOU'}</span><h3>${q.title}</h3><p class="panel-copy">${q.desc}</p><p class="panel-copy">${q.progress}</p>${q.reward?button(`领取来信 · ${q.reward} 叶币`,'claim','',!q.done):''}</div><h3 class="side-title" style="margin-top:24px">邻居通讯录</h3>`;
         html += D.neighbors.map(n=>{const location=N.whereabouts(s,n.id);return row(n.name+' · '+n.species,`${s.story.met.includes(n.id)?'已认识':'尚未见面'} · 好感 ${s.friends[n.id].points}<br>栗风小镇 · ${location.travelling?'正在前往':''}${location.name}`,button('去找'+n.name,'follow',n.id,false,true),n.color);}).join('');
+        html += `<h3 class="side-title" style="margin-top:24px">天气里的小故事 · ${s.exploration.completed.length}/6</h3><p class="panel-copy">三个故事：风的问候铃；六个故事：林间鸟屋。故事没有截止日期，也不影响聚会主线。</p>`;
+        html += root.ForestExploration.events.map(e=>row(e.name,`${s.exploration.completed.includes(e.id)?'已完成':s.exploration.discovered.includes(e.id)?'已发现':'等待发现'} · ${E.names[e.weather]}<br>${W.maps[e.map].name} · ${e.hint}`,'')).join('');
         html += '<p class="panel-copy">小屋休息后，森林材料和聊天送礼次数会补充。作物按现实时间成长；可趁等待时探索、拜访和制作。地图点击可自动寻路，1/2/3 快速切换农具。</p>';
       } else if (openKind === 'festival') {
         title = s.story.festival ? '灯火亮起，我们都是家人' : '为森林留一张团聚的桌子';
@@ -118,6 +127,10 @@
       if (action === 'rest') { app.perform(() => C.rest(s)); close(); }
       if (action === 'journal') open('journal');
       if (action === 'follow') app.follow(id);
+      if (action === 'explore-step' && openKind === 'exploration' && context.id === id) {
+        if(eventStep === 0) { eventStep=1; toast('第一步完成了，再留下一点心意。'); render(); }
+        else { app.perform(() => root.ForestExploration.complete(s,id)); }
+      }
       if (action === 'activity-open') open('activity', { id });
       else if (action === 'activity-back') open('npc', { id });
       else if (action.startsWith('activity-')) mini.action(action,id);
@@ -136,7 +149,7 @@
     });
     content.addEventListener('change', e => { const id = e.target.dataset.setting; if (id) { app.state.settings[id] = e.target.checked; app.applySettings(); app.save(); } });
     $('#close-panel').addEventListener('click', close);
-    panel.addEventListener('close', () => { openKind = ''; app.canvas.focus({ preventScroll: true }); });
+    panel.addEventListener('close', () => { if (!panel.open) { openKind = ''; app.canvas.focus({ preventScroll: true }); } });
     $('#farm-tools').addEventListener('click', () => open('tools'));
     return { open, close, refresh, toast, tick() { if (panel.open && openKind === 'activity') mini.tick(); }, get isOpen() { return panel.open; } };
   }

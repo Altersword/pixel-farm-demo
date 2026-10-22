@@ -35,7 +35,12 @@ async function run(page) {
       const s = JSON.parse(localStorage.getItem('pixel_farm_save'));
       return ForestWorld.objects(ForestWorld.maps[s.player.map],s).find(o => o.id === id);
     }, id);
-    assert.ok(o, id); await walk(page, o.x, o.y, true); await clickTile(page, o.x, o.y);
+    assert.ok(o, id);
+    if(o.kind==='npc') {
+      await page.keyboard.press('j');await page.locator(`[data-action=follow][data-id=${id}]`).click();
+      await page.waitForFunction(name=>document.querySelector('#panel').open&&document.querySelector('#panel-title').textContent.includes(name),o.name,{timeout:20000});return;
+    }
+    await walk(page, o.x, o.y, true); await clickTile(page, o.x, o.y);
   }
   async function claim() {
     await close(); await page.keyboard.press('j');
@@ -134,7 +139,11 @@ async function run(page) {
     if(await activities.food(page,activityHelpers))break;
     await harvest();await plant();
     const state=await read(page);
-    if(!state.plots.some(p=>p.crop))throw new Error('Party ingredients could not be grown');
+    if(!state.plots.some(p=>p.crop)) {
+      const remaining=await page.evaluate(()=>ForestData.activities);
+      assert.ok(Object.entries(remaining).filter(([id,a])=>a.costs&&!state.story.activities[id]).every(([,a])=>Object.entries(a.costs).every(([crop,n])=>(state.inventory[crop]||0)>=n)),'All missing ingredients must be growing or ready');
+      continue; // The final harvest can make the kitchen ready with no crops left growing.
+    }
     await page.waitForFunction(()=>JSON.parse(localStorage.getItem('pixel_farm_save')).plots.some(p=>p.crop&&p.progress>=100),null,{timeout:150000});
   }
   await build(); await claim();

@@ -4,7 +4,7 @@
   const emptyPlot = () => ({ crop: null, progress: 0, watered: false, plantedAt: null });
   function newGame() {
     return {
-      version: 2, coins: 100, tool: 'plant', selectedSeed: 'tomato',
+      version: 3, coins: 100, tool: 'plant', selectedSeed: 'tomato',
       plots: Array.from({ length: 15 }, emptyPlot), inventory: {},
       seeds: { tomato: 5, carrot: 3, corn: 2, strawberry: 2, watermelon: 2 },
       ordersCompleted: 0, player: { map: 'farm', x: 14, y: 8, facing: 'down' },
@@ -14,7 +14,7 @@
   }
   function migrate(input) {
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('存档必须是有效的对象');
-    if (input.version !== undefined && input.version !== 2) throw new Error('此存档版本暂不支持');
+    if (input.version !== undefined && input.version !== 2 && input.version !== 3) throw new Error('此存档版本暂不支持');
     const state = newGame();
     const nonnegative = value => Number.isSafeInteger(value) && value >= 0 && value <= 1e9;
     for (const field of ['coins', 'ordersCompleted']) {

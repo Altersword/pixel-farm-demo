@@ -53,6 +53,12 @@
       : map.objects;
   }
   function objectAt(map, x, y, state) { return objects(map, state).find(o => x >= o.x && x < o.x + o.w && y >= o.y && y < o.y + o.h); }
+  function hitTest(map, x, y, state) {
+    return objects(map,state).slice().reverse().find(o=>{
+      const xx=o.visualX===undefined?o.x:o.visualX, yy=o.visualY===undefined?o.y:o.visualY;
+      return x>=xx&&x<xx+o.w&&y>=yy&&y<yy+o.h;
+    });
+  }
   function walkable(map, x, y) {
     if (x < 1 || y < 1 || x >= W - 1 || y >= H - 1 || ['tree', 'water'].includes(map.tiles[y][x])) return false;
     const o = objectAt(map, x, y);
@@ -99,6 +105,6 @@
     }
     return null;
   }
-  root.ForestWorld = { maps, W, H, objects, objectAt, walkable, near, target, move, pathTo };
+  root.ForestWorld = { maps, W, H, objects, objectAt, hitTest, walkable, near, target, move, pathTo };
   if (typeof module !== 'undefined') module.exports = root.ForestWorld;
 })(globalThis);

@@ -31,7 +31,7 @@
       const snap = changedMap || s.settings.reducedMotion || width !== view.width || height !== view.height;
       const easing = snap ? 1 : 1 - Math.exp(-Math.min(100, Math.max(0, time - previousTime)) / 55);
       view = { x: view.x + (aimX - view.x) * easing, y: view.y + (aimY - view.y) * easing, tile: T, width, height };
-      latestView = { ...view, playerX: visual.x, playerY: visual.y }; previousTime = time;
+      latestView = { ...view, playerX: visual.x, playerY: visual.y, actors: W.objects(map,s).filter(o=>o.kind==='npc').map(o=>({...o})) }; previousTime = time;
       const px = x => x * T - view.x, py = y => y * T - view.y;
       for (let y = 0; y < W.H; y++) for (let x = 0; x < W.W; x++) {
         const type = map.tiles[y][x], hash = (x * 31 + y * 73) % 17, xx = px(x), yy = py(y);
@@ -48,7 +48,7 @@
         if (type === 'path' && hash < 4) rect(xx + 10, yy + 14, 3, 2, '#c3b58d');
       }
       const target = W.target(s);
-      const drawObjects = W.objects(map, s).map(o => ({ ...o, sort: o.y + o.h }));
+      const drawObjects = W.objects(map, s).map(o => ({ ...o, sort: (o.visualY === undefined ? o.y : o.visualY) + o.h }));
       drawObjects.push({ kind: 'player', x: visual.x, y: visual.y, w: 1, h: 1, sort: visual.y + 1.1 });
       for (let y = 0; y < W.H; y++) for (let x = 0; x < W.W; x++) if (map.tiles[y][x] === 'tree') drawObjects.push({ kind: 'tree', x, y, w: 1, h: 1, sort: y + 1 });
       drawObjects.sort((a, b) => a.sort - b.sort);
@@ -80,6 +80,13 @@
           if (!spent) rect(x+T-8,y+10,3,3,'#ead6a0');
         } else if (o.kind === 'treasure') {
           if (!s.story.treasures.includes(o.id)) { rect(x+15,y+15,12,12,'#bf965b');rect(x+12,y+12,18,5,'#896b44');rect(x+18,y+9,4,4,'#c9b27c');rect(x+16,y+18,3,5,'#e4c98b'); }
+        } else if (o.kind === 'exploration') {
+          const complete=s.exploration.completed.includes(o.id), available=root.ForestEnvironment.weather(s)===o.weather;
+          const sway=s.settings.reducedMotion||o.sprite!=='chime'?0:Math.sin(time/750)*1.2;
+          sprites.furniture(o.sprite,x+sway,y,T);
+          if(!complete&&available)rect(x+T-7,y+3,4,4,'#f9e5a0');
+          if(complete)rect(x+T-8,y+5,5,2,'#7b9b64');
+          if(target&&target.id===o.id)label(o.name,x+T/2,y-5);
         } else if (o.kind === 'tree') {
           sprites.tree(x, y, T);
         } else if (['home', 'shop', 'house', 'bakery'].includes(o.kind)) {
@@ -132,7 +139,7 @@
       }
       function label(text, x, y) { ctx.font = '11px "Microsoft YaHei", sans-serif'; ctx.textAlign = 'center'; const w = ctx.measureText(text).width; rect(x - w / 2 - 5, y - 11, w + 10, 16, '#f8efd9c9'); ctx.fillStyle = '#344f3e'; ctx.fillText(text, x, y); }
     }
-    return { draw, tileAt(clientX, clientY) { const r = canvas.getBoundingClientRect(); return { x: Math.floor((clientX - r.left + view.x) / view.tile), y: Math.floor((clientY - r.top + view.y) / view.tile) }; }, get view() { return view; } };
+    return { draw, pointAt(clientX,clientY) { const r=canvas.getBoundingClientRect(); return {x:(clientX-r.left+view.x)/view.tile,y:(clientY-r.top+view.y)/view.tile}; }, tileAt(clientX, clientY) { const r = canvas.getBoundingClientRect(); return { x: Math.floor((clientX - r.left + view.x) / view.tile), y: Math.floor((clientY - r.top + view.y) / view.tile) }; }, get view() { return view; } };
   }
   root.ForestArt = { create, get view() { return latestView && { ...latestView }; } };
 })(globalThis);
