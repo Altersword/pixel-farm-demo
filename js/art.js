@@ -81,6 +81,10 @@
           const stride = !s.settings.reducedMotion && o.kind === 'player' && time < strideUntil ? Math.floor(time / 90) % 2 : 0;
           sprites.character(o.id || 'player', x, y, T, p.facing, stride);
           if (n) label(n.name, x + T / 2, y - 7);
+        } else if (o.kind === 'festival') {
+          rect(x+3,y+10,w-6,23,'#ae8a5c');rect(x+5,y+12,w-10,16,'#eddbad');
+          for(let i=0;i<3;i++){rect(x+10+i*23,y+17,12,7,'#f8edcc');rect(x+13+i*23,y+19,5,3,['#ce765b','#93a160','#dda44e'][i]);}
+          if(s.story&&s.story.festival) {sprites.furniture('bunting',x-4,y-35,w+8);label('森林聚会 · 欢迎回家',x+w/2,y-40);}
         } else {
           const color = { orders: '#b3895f', workbench: '#a1845e', bag: '#ad8254', festival: '#d4b68b', expand: '#b4a278', sign: '#b4a278' }[o.kind] || '#b4a278';
           rect(x + 6, y + 5, w - 12, h - 10, color); rect(x + 9, y + 8, w - 18, 5, '#e9d7aa');

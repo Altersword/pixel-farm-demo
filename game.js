@@ -3,7 +3,9 @@
   'use strict';
   const C = ForestCore, W = ForestWorld, D = ForestData;
   const canvas = document.querySelector('#world');
-  const storage = ForestStorage.create(localStorage), loaded = storage.load();
+  let backend;
+  try { backend = localStorage; } catch (_) { backend = { getItem: () => null, setItem: () => { throw new Error('浏览器存储不可用'); } }; }
+  const storage = ForestStorage.create(backend), loaded = storage.load();
   const audio = ForestAudio.create();
   const app = {
     state: loaded.state, protected: !!loaded.protected, canvas,
@@ -21,6 +23,7 @@
       const url = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
       const link = document.createElement('a'); link.href = url; link.download = raw ? 'moss-original-backup.json' : 'moss-and-morning-save.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     },
+    recover() { try { storage.recover(); app.protected = false; app.save(); ui.refresh(); ui.toast('原始数据已保留为损坏备份，现在可以保存新进度。'); } catch (_) { ui.toast('无法写入浏览器存储，请先导出进度。'); } },
   };
   let route = [], pending = null, held = '', lastStep = 0, lastFrame = 0, lastGrowth = 0, lastSave = 0;
   const art = ForestArt.create(canvas), ui = ForestUI.create(app);
@@ -38,6 +41,7 @@
       return;
     }
     if (object.kind === 'sign') { ui.toast(object.name); return; }
+    if (object.kind === 'npc') app.perform(() => C.talk(app.state, object.id));
     ui.open({ home: 'home', bag: 'bag', shop: 'shop', orders: 'orders', npc: 'npc' }[object.kind] || object.kind, object);
   }
   function step(dx, dy) {
@@ -82,7 +86,7 @@
     try {
       if (file.size > 1000000) throw new Error('文件过大，请选择小于 1 MB 的存档');
       const next = storage.import(await file.text()); app.state = next; app.protected = false;
-      validatePosition(); app.stopWalking(); app.applySettings(); ui.close(); ui.refresh(); ui.toast('存档导入成功，欢迎回家。');
+      validatePosition(); app.stopWalking(); app.applySettings(); app.save(); ui.close(); ui.refresh(); ui.toast('存档导入成功，欢迎回家。');
     } catch (error) { ui.toast('导入失败：' + error.message); }
     e.target.value = '';
   });
@@ -111,5 +115,6 @@
   window.addEventListener('pagehide', () => app.save());
   validatePosition(); C.grow(app.state); app.applySettings(); ui.refresh(); app.save();
   if (loaded.error) ui.toast(loaded.error); else ui.toast('欢迎回家。向北是森林，向东是小镇。');
+  if (!loaded.error && !app.state.settings.onboardingSeen) ui.open('welcome');
   requestAnimationFrame(frame);
 })();

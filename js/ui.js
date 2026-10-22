@@ -8,14 +8,19 @@
     let openKind = '', context = null, toastTimer, lastHTML = '';
     const button = (label, action, id = '', disabled = false, secondary = false) => `<button class="btn${secondary ? ' secondary' : ''}" data-action="${action}" data-id="${id}" ${disabled ? 'disabled' : ''}>${label}</button>`;
     function row(name, desc, actions, color = '#b9c69b') { return `<div class="item-row"><span class="swatch" style="--item-color:${color}"></span><div class="item-body"><h3>${esc(name)}</h3><p>${desc}</p></div>${actions}</div>`; }
-    function toast(text) { clearTimeout(toastTimer); $('#scene-toast').textContent = text; $('#scene-toast').classList.add('show'); toastTimer = setTimeout(() => $('#scene-toast').classList.remove('show'), 3300); }
+    function toast(text) {
+      clearTimeout(toastTimer); $('#scene-toast').textContent = text; $('#scene-toast').classList.add('show');
+      const notice = $('#panel-notice'); notice.textContent = text; notice.hidden = !panel.open;
+      toastTimer = setTimeout(() => { $('#scene-toast').classList.remove('show'); notice.hidden = true; }, 5000);
+    }
     function refresh() {
       const s = app.state, map = W.maps[s.player.map], order = C.currentOrder(s);
       $('#coin-amount').textContent = s.coins;
       $('#area-name').textContent = $('#map-label').textContent = map.name;
       $('#area-subtitle').textContent = map.subtitle;
       $('#current-tool').textContent = { plant: '种植' + D.crops[s.selectedSeed].name, water: '浇水', harvest: '收获' }[s.tool];
-      $('#quest-preview').innerHTML = `<p class="side-label">下一页故事</p><h3 class="side-title">先去认识这片森林</h3><p class="side-copy">已探索 ${s.world.visited.length} / 3 个地方<br>种点蔬菜，带上收获拜访邻居。</p><button class="side-link" data-menu="journal">翻开生活手札 ↗</button>`;
+      const quest = C.quest(s);
+      $('#quest-preview').innerHTML = `<p class="side-label">${quest.complete ? '故事仍在继续' : '下一页故事'}</p><h3 class="side-title">${quest.title}</h3><p class="side-copy">${quest.desc}<br>${quest.progress}</p><button class="side-link" data-menu="journal">${quest.done ? '心愿已完成 · 领取来信 ↗' : '翻开生活手札 ↗'}</button>`;
       $('#order-preview').innerHTML = `<p class="side-label">邻里的小心愿 / ${s.ordersCompleted} 单已送达</p><h3 class="side-title">${order.name}</h3><p class="side-copy">${Object.entries(order.wants).map(([id, n]) => `${D.crops[id].name} ${s.inventory[id] || 0}/${n}`).join(' · ')}</p><p class="side-copy">报酬 ${C.reward(order)} 叶币</p>`;
       const target = W.target(s);
       $('#interaction-label').textContent = target ? target.kind === 'plot' ? `${target.name} · ${s.tool === 'plant' ? '种植' : s.tool === 'water' ? '浇水' : '收获'}` : target.name : '点地图走走，或用方向键移动';
@@ -24,13 +29,16 @@
       if (panel.open) render();
     }
     function open(kind, data = null) {
-      openKind = kind; context = data; app.stopWalking(); render();
+      openKind = kind; context = data; $('#panel-notice').hidden = true; app.stopWalking(); render();
       if (!panel.open) panel.showModal();
     }
     function close() { panel.close(); openKind = ''; app.canvas.focus({ preventScroll: true }); }
     function render() {
       const s = app.state; let title = '', html = '';
-      if (openKind === 'tools') {
+      if (openKind === 'welcome') {
+        title = '欢迎搬来苔光小筑';
+        html = `<p class="dialogue-copy">「森林不赶时间。<br>我们也慢慢来。」</p><div class="item-row"><p class="panel-copy">① 方向键 / WASD 移动，也能点击地图自动走近。</p></div><div class="item-row"><p class="panel-copy">② 选好种子，靠近农田按 E；1/2/3 切换种植、浇水、收获。</p></div><div class="item-row"><p class="panel-copy">③ 向北探索森林，向东拜访小镇。用收获完成邻居订单，手札会记录下一步。</p></div><p class="panel-copy">你的进度会自动保存在这个浏览器，设置里可以导出备份。声音默认关闭，随时可以开启。</p>${button('种下第一份期待','welcome')}`;
+      } else if (openKind === 'tools') {
         title = '口袋里的种植工具';
         html = '<p class="panel-copy">选好工具，走到农田旁按 E，或直接点击地块走近操作。</p><div class="btn-row">' + ['plant', 'water', 'harvest'].map(id => button({ plant: '种植', water: '浇水', harvest: '收获' }[id], 'tool', id, false, s.tool !== id)).join('') + '</div>';
         html += Object.entries(D.crops).map(([id, crop]) => row(crop.name, `种子 ${s.seeds[id] || 0} 颗 · 生长 ${crop.growTime} 秒`, button(s.selectedSeed === id ? '已选' : '选择', 'seed', id), crop.color)).join('');
@@ -52,7 +60,8 @@
         title = '邻里订单板'; const order = C.currentOrder(s), n = D.neighbors.find(n => n.id === order.neighbor);
         html = `<p class="panel-copy">没有截止日期。慢慢种，等作物成熟了再来。已完成 ${s.ordersCompleted} 单。</p><article class="order-card"><span class="eyebrow">来自${n.name}的信</span><h3>${order.name}</h3>${Object.entries(order.wants).map(([id, count]) => `<div class="ingredient ${(s.inventory[id] || 0) >= count ? 'enough' : ''}"><span>${D.crops[id].name}</span><span>${s.inventory[id] || 0} / ${count}</span></div>`).join('')}<div class="reward">${C.reward(order)} 叶币<small>比直接出售多 50% · 向上取整</small></div>${button('交付这一份心意', 'deliver', '', !C.canDeliver(s))}</article>`;
       } else if (openKind === 'npc') {
-        const n = D.neighbors.find(n => n.id === context.id); title = n.name + '的问候'; html = `<p class="panel-copy">${n.greeting}</p><p class="pill">最喜欢${D.crops[n.likes].name}</p>`;
+        const n = D.neighbors.find(n => n.id === context.id), f=s.friends[n.id]; title = n.name + '的问候';
+        html = `<p class="eyebrow">${n.species} / ${f.points>=6?'亲密朋友':f.points>=3?'森林朋友':'初识的邻居'}</p><p class="dialogue-copy">「${C.dialogue(s,n.id)}」</p><p class="pill">好感 ${f.points} · 最喜欢${D.crops[n.likes].name}</p><p class="panel-copy">每天首次聊天 +1；交付这位邻居的订单 +2；每天可送一份喜欢的作物 +2。好感达到 3 收到纪念礼，达到 6 解锁新对话。</p>${button(`送一份${D.crops[n.likes].name}（拥有 ${s.inventory[n.likes]||0}）`,'gift',n.id,!(s.inventory[n.likes]>0)||f.lastGiftDay===C.day(s))}`;
       } else if (openKind === 'workbench') {
         title = '让双手做一点喜欢的东西';
         html = `<p class="panel-copy">材料来自风铃森林。每日可重新采集，也可以回小屋休息迎接新的一天。</p><p class="pill">木材 ${s.materials.wood} · 石料 ${s.materials.stone}</p>`;
@@ -66,9 +75,15 @@
         html = `<p class="panel-copy">今天也辛苦了。休息会迎来下一个清晨，森林材料会重新出现。作物依旧按现实时间慢慢成长。</p>${button('休息到明天', 'rest')}<div class="btn-row">${button('翻开手札', 'journal', '', false, true)}</div>`;
       } else if (openKind === 'settings') {
         title = '把日子调成喜欢的样子';
-        html = `<label class="setting-row">静音<input type="checkbox" data-setting="mute" ${s.settings.mute ? 'checked' : ''}></label><label class="setting-row">减少动态效果<input type="checkbox" data-setting="reducedMotion" ${s.settings.reducedMotion ? 'checked' : ''}></label><p class="panel-copy">存档保存在当前浏览器。换浏览器或设备前，请先导出备份。</p><div class="btn-row">${button('导出存档', 'export')}${button('导入存档', 'import', '', false, true)}${button('导出原始备份', 'raw', '', false, true)}</div><p class="panel-copy">WASD / 方向键移动，E 互动，B 背包，J 手札，Esc 关闭。点击地图会自动走近目标；手机也能用底部方向按钮。</p>${app.protected ? '<p class="notice">原始存档有问题，自动保存已暂停。先导出原始备份，再导入有效存档恢复。</p>' : ''}`;
+        html = `<label class="setting-row">静音<input type="checkbox" data-setting="mute" ${s.settings.mute ? 'checked' : ''}></label><label class="setting-row">减少动态效果<input type="checkbox" data-setting="reducedMotion" ${s.settings.reducedMotion ? 'checked' : ''}></label><p class="panel-copy">存档保存在当前浏览器。换浏览器或设备前，请先导出备份。</p><div class="btn-row">${button('导出存档', 'export')}${button('导入存档', 'import', '', false, true)}${button('导出原始备份', 'raw', '', false, true)}</div><p class="panel-copy">WASD / 方向键移动，E 互动，B 背包，J 手札，Esc 关闭。点击地图会自动走近目标；手机也能用底部方向按钮。</p>${app.protected ? `<p class="notice">原始存档有问题，自动保存已暂停。可先导出原始备份，导入有效存档恢复；也可保留损坏备份后启用当前新进度。</p>${button('启用新存档，保留损坏备份','recover')}` : ''}`;
       } else if (openKind === 'journal') {
-        title = '森林生活手札'; html = '<p class="panel-copy">欢迎搬来苔光小筑。这里没有催促你的钟声，只有等你浇水的幼苗。</p>' + ['农场：靠近地块，选种子、浇水、收获。', '向东：栗风小镇的杂货铺和邻居们。', '向北：风铃森林里有松树和池塘。', '订单：把收获留在背包，交付可赚更多叶币。', '保存：所有重要操作会立即存档。'].map(x => `<div class="item-row"><p class="panel-copy">${x}</p></div>`).join('');
+        title = '森林生活手札'; const q=C.quest(s);
+        html = `<div class="order-card"><span class="eyebrow">${q.complete?'A STORY THAT GOES ON':'A LETTER FOR YOU'}</span><h3>${q.title}</h3><p class="panel-copy">${q.desc}</p><p class="panel-copy">${q.progress}</p>${q.reward?button(`领取来信 · ${q.reward} 叶币`,'claim','',!q.done):''}</div><h3 class="side-title" style="margin-top:24px">邻居通讯录</h3>`;
+        html += D.neighbors.map(n=>row(n.name+' · '+n.species,`${s.story.met.includes(n.id)?'已认识':'尚未见面'} · 好感 ${s.friends[n.id].points} · 喜欢${D.crops[n.likes].name}`,'',n.color)).join('');
+        html += '<p class="panel-copy">小屋休息后，森林材料和聊天送礼次数会补充。作物按现实时间成长；可趁等待时探索、拜访和制作。地图点击可自动寻路，1/2/3 快速切换农具。</p>';
+      } else if (openKind === 'festival') {
+        title = s.story.festival ? '灯火亮起，我们都是家人' : '为森林留一张团聚的桌子';
+        html = s.story.festival ? `<div class="celebration"><span class="eyebrow">THE WOODS FEEL LIKE HOME</span><h3>欢迎成为森林的一部分。</h3><p>果酱、蔬菜汤和一桌熟悉的笑脸。<br>你种下的不只是作物，也是一段新的生活。</p></div>${D.neighbors.map(n=>row(n.name,C.dialogue(s,n.id),'',n.color)).join('')}<p class="panel-copy">主线完成后可以继续经营、制作、交付订单，与朋友们迎接更多清晨。</p>` : `<p class="dialogue-copy">「等到灯亮起来，我们就在这里见。」</p><p class="panel-copy">${C.quest(s).desc}</p>${button('邀请大家，开始森林聚会','festival','',s.story.stage!==5)}`;
       } else {
         title = context ? context.name : '林间的一角'; html = '<p class="panel-copy">这里的故事还在慢慢生长。先到森林与小镇看看，或者回农田种下新作物。</p>';
       }
@@ -88,10 +103,15 @@
       if (action === 'buyseed' || action === 'buy') app.perform(() => C.buy(s, id, action === 'buyseed'));
       if (action === 'sell') app.perform(() => C.sell(s, id));
       if (action === 'deliver') app.perform(() => C.deliver(s));
+      if (action === 'gift') app.perform(() => C.gift(s,id));
+      if (action === 'claim') app.perform(() => C.claimQuest(s));
+      if (action === 'festival') app.perform(() => C.festival(s));
       if (action === 'craft') app.perform(() => C.craft(s, id));
       if (action === 'expand') app.perform(() => C.expand(s));
       if (action === 'rest') { app.perform(() => C.rest(s)); close(); }
       if (action === 'journal') open('journal');
+      if (action === 'welcome') { s.settings.onboardingSeen = true; app.save(); close(); }
+      if (action === 'recover') app.recover();
       if (action === 'place') {
         if (s.player.map !== 'farm') { toast('回农场再布置吧。'); return; }
         const o = context && context.kind === 'decor' ? context : W.target(s);

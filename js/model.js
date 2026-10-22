@@ -8,7 +8,7 @@
       plots: Array.from({ length: 15 }, emptyPlot), inventory: {},
       seeds: { tomato: 5, carrot: 3, corn: 2, strawberry: 2, watermelon: 2 },
       ordersCompleted: 0, player: { map: 'farm', x: 14, y: 8, facing: 'down' },
-      world: { elapsed: 0, visited: ['farm'], gathered: {} }, settings: { mute: true, reducedMotion: false },
+      world: { elapsed: 0, visited: ['farm'], gathered: {} }, settings: { mute: true, reducedMotion: false, onboardingSeen: false },
       materials: { wood: 0, stone: 0 }, crafted: {}, expansion: 0, decorations: [],
     };
   }
@@ -69,7 +69,8 @@
       if (Number.isFinite(input.world.elapsed) && input.world.elapsed >= 0) state.world.elapsed = input.world.elapsed;
       if (Array.isArray(input.world.visited)) state.world.visited = ['farm', 'forest', 'village'].filter(x => input.world.visited.includes(x));
     }
-    if (input.settings) state.settings = { mute: input.settings.mute !== false, reducedMotion: !!input.settings.reducedMotion };
+    if (input.settings) state.settings = { mute: input.settings.mute !== false, reducedMotion: !!input.settings.reducedMotion, onboardingSeen: input.settings.onboardingSeen !== false };
+    else state.settings.onboardingSeen = true;
     for (const field of ['materials', 'crafted']) {
       if (input[field] !== undefined) {
         if (!input[field] || typeof input[field] !== 'object' || Array.isArray(input[field])) throw new Error('家园库存格式无效');

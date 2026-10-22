@@ -1,12 +1,7 @@
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { pathToFileURL }=require('node:url');const path=require('node:path');const fs=require('node:fs');const assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..');const output=process.env.FOREST_OUTPUT || path.join(root,'..','..','outputs');
-async function read(page){return page.evaluate(()=>JSON.parse(localStorage.getItem('pixel_farm_save')));}
-async function walk(page,x,y,adjacent=false){
- const route=await page.evaluate(({x,y,adjacent})=>ForestWorld.pathTo(JSON.parse(localStorage.getItem('pixel_farm_save')),x,y,adjacent),{x,y,adjacent});assert.ok(route,'route exists');
- for(const [dx,dy]of route){const before=(await read(page)).player;const key=dx<0?'ArrowLeft':dx>0?'ArrowRight':dy<0?'ArrowUp':'ArrowDown';await page.keyboard.down(key);await page.waitForFunction(p=>{const n=JSON.parse(localStorage.getItem('pixel_farm_save')).player;return n.x!==p.x||n.y!==p.y||n.map!==p.map},before,{timeout:3000});await page.keyboard.up(key);if((await read(page)).player.map!==before.map)break;}
-}
-async function clickTile(page,x,y){const p=(await read(page)).player;const r=await page.locator('#world').boundingBox();const t=r.width<500?34:42;const cx=Math.max(0,Math.min(28*t-r.width,p.x*t-r.width/2)),cy=Math.max(0,Math.min(20*t-r.height,p.y*t-r.height/2));await page.locator('#world').click({position:{x:(x+.5)*t-cx,y:(y+.5)*t-cy}});}
+const {read,walk,clickTile}=require('./helpers.cjs');
 async function milestone3(page){
  await walk(page,1,9);await walk(page,14,1);
  for(const [x,y,id] of [[5,7,'wood-0'],[8,12,'wood-1'],[8,6,'stone-0']]){await walk(page,x,y,true);await clickTile(page,x,y);await page.waitForFunction(id=>Object.hasOwn(JSON.parse(localStorage.getItem('pixel_farm_save')).world.gathered,id),id);}
@@ -17,7 +12,7 @@ async function milestone3(page){
  await walk(page,3,3,true);await clickTile(page,3,3);await page.waitForSelector('#panel[open]');await page.locator('[data-action=rest]').click();assert.equal(Math.floor((await read(page)).world.elapsed/720000),1);
  await page.reload();assert.equal((await read(page)).expansion,1);assert.equal((await read(page)).inventory.flowerbox,1);
 }
-(async()=>{const browser=await chromium.launch({headless:true,channel:'chrome'});try{fs.mkdirSync(output,{recursive:true});const page=await browser.newPage({viewport:{width:1440,height:980}});const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(pathToFileURL(path.join(root,'index.html')).href);await page.waitForFunction(()=>localStorage.getItem('pixel_farm_save'));
+(async()=>{const browser=await chromium.launch({headless:true,channel:'chrome'});try{fs.mkdirSync(output,{recursive:true});const page=await browser.newPage({viewport:{width:1440,height:980}});const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(pathToFileURL(path.join(root,'index.html')).href);await page.waitForFunction(()=>localStorage.getItem('pixel_farm_save'));if(await page.locator('[data-action=welcome]').count())await page.locator('[data-action=welcome]').click();
  await walk(page,7,8,true);await clickTile(page,7,8);await page.waitForFunction(()=>JSON.parse(localStorage.getItem('pixel_farm_save')).plots[0].crop==='tomato');await page.keyboard.press('2');await clickTile(page,7,8);await page.waitForFunction(()=>JSON.parse(localStorage.getItem('pixel_farm_save')).plots[0].watered===true);
  await walk(page,14,1);assert.equal((await read(page)).player.map,'forest');await walk(page,14,18);await walk(page,26,9);assert.equal((await read(page)).player.map,'village');
  await walk(page,5,3,true);await clickTile(page,5,3);await page.waitForSelector('#panel[open]');assert.match(await page.locator('#panel-title').innerText(),/杂货铺/);await page.locator('[data-action=buyseed][data-id=tomato]').click();assert.equal((await read(page)).coins,95);await page.keyboard.press('Escape');

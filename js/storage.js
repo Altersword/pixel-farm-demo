@@ -25,6 +25,7 @@
         return next;
       },
       raw() { return storage.getItem(key); },
+      recover() { const raw = storage.getItem(key); if (raw) storage.setItem(key + '_damaged_backup', raw); },
     };
   }
   root.ForestStorage = { create, key };
