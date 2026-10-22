@@ -33,7 +33,7 @@ async function run(page) {
     await close();
     const o = await page.evaluate(id => {
       const s = JSON.parse(localStorage.getItem('pixel_farm_save'));
-      return ForestWorld.maps[s.player.map].objects.find(o => o.id === id);
+      return ForestWorld.objects(ForestWorld.maps[s.player.map],s).find(o => o.id === id);
     }, id);
     assert.ok(o, id); await walk(page, o.x, o.y, true); await clickTile(page, o.x, o.y);
   }

@@ -1,7 +1,7 @@
 (function (root) {
   'use strict';
   function create() {
-    let context, gain, timer, index = 0, enabled = false, map = 'farm', night = false;
+    let context, gain, timer, index = 0, enabled = false, map = 'farm', night = false, weather = 'sun';
     const notes = [261.63, 329.63, 392, 440, 523.25, 440, 392, 329.63];
     function note(frequency, duration = .65, volume = .1, type = 'sine') {
       if (!context || context.state !== 'running') return;
@@ -13,7 +13,8 @@
     }
     function tick() {
       if (!enabled || document.hidden) return;
-      note(notes[index++ % notes.length] * (night ? .5 : 1), 1.4, .055);
+      note(notes[index++ % notes.length] * (night || weather === 'mist' ? .5 : 1), 1.4, .055);
+      if (weather === 'rain') note(120 + (index % 5) * 37, .12, .012, 'triangle');
       if (index % 4 === 0) note((map === 'forest' ? 1174.66 : 987.77), .18, .025);
       if (index % 8 === 0) note(notes[(index + 2) % notes.length] / 2, 2.3, .04, 'triangle');
     }
@@ -28,7 +29,7 @@
       await context.resume(); if (!timer) { tick(); timer = setInterval(tick, 1800); }
     }
     document.addEventListener('visibilitychange', () => { if (!context) return; if (document.hidden) context.suspend(); else if (enabled) context.resume().catch(() => {}); });
-    return { set, scene(id, isNight) { map = id; night = isNight; }, effect(success) { if (enabled) note(success ? 659.25 : 220, .16, .065, 'triangle'); } };
+    return { set, scene(id, isNight, currentWeather) { map = id; night = isNight; weather = currentWeather; }, effect(success) { if (enabled) note(success ? 659.25 : 220, .16, .065, 'triangle'); } };
   }
   root.ForestAudio = { create };
 })(globalThis);

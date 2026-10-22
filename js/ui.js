@@ -1,6 +1,6 @@
 (function (root) {
   'use strict';
-  const D = root.ForestData, C = root.ForestCore, W = root.ForestWorld;
+  const D = root.ForestData, C = root.ForestCore, W = root.ForestWorld, E = root.ForestEnvironment, N = root.ForestNeighbors;
   const $ = s => document.querySelector(s);
   const esc = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   function create(app) {
@@ -26,7 +26,8 @@
       const target = W.target(s);
       $('#interaction-label').textContent = target ? target.kind === 'plot' ? `${target.name} · ${s.tool === 'plant' ? '种植' : s.tool === 'water' ? '浇水' : '收获'}` : target.name : '点地图走走，或用方向键移动';
       const day = Math.floor(s.world.elapsed / D.dayLength) + 1, t = (s.world.elapsed % D.dayLength) / D.dayLength;
-      $('#day-time').textContent = `第 ${day} 天 · ${t < .25 ? '清晨' : t < .55 ? '午后' : t < .75 ? '黄昏' : '星夜'}`;
+      $('#day-time').textContent = `第 ${day} 天 · ${E.periods[E.period(s)]}`;
+      $('#day-phase').textContent = `${E.names[E.weather(s)]} · 明日${E.names[E.weather(s,1)]}`;
       if (panel.open) render();
     }
     function open(kind, data = null) {
@@ -64,7 +65,7 @@
         html = `<p class="panel-copy">没有截止日期。慢慢种，等作物成熟了再来。已完成 ${s.ordersCompleted} 单。</p><article class="order-card"><span class="eyebrow">来自${n.name}的信</span><h3>${order.name}</h3>${Object.entries(order.wants).map(([id, count]) => `<div class="ingredient ${(s.inventory[id] || 0) >= count ? 'enough' : ''}"><span>${D.crops[id].name}</span><span>${s.inventory[id] || 0} / ${count}</span></div>`).join('')}<div class="reward">${C.reward(order)} 叶币<small>比直接出售多 50% · 向上取整</small></div>${button('交付这一份心意', 'deliver', '', !C.canDeliver(s))}</article>`;
       } else if (openKind === 'npc') {
         const n = D.neighbors.find(n => n.id === context.id), f=s.friends[n.id]; title = n.name + '的问候';
-        html = `<p class="eyebrow">${n.species} / ${f.points>=6?'亲密朋友':f.points>=3?'森林朋友':'初识的邻居'}</p><p class="dialogue-copy">「${C.dialogue(s,n.id)}」</p><p class="pill">好感 ${f.points} · 最喜欢${D.crops[n.likes].name}</p><p class="panel-copy">每天首次聊天 +1；交付这位邻居的订单 +2；每天可送一份喜欢的作物 +2。好感达到 3 收到纪念礼，达到 6 解锁新对话。</p>${button(`送一份${D.crops[n.likes].name}（拥有 ${s.inventory[n.likes]||0}）`,'gift',n.id,!(s.inventory[n.likes]>0)||f.lastGiftDay===C.day(s))}`;
+        html = `<p class="eyebrow">${n.species} / ${f.points>=6?'亲密朋友':f.points>=3?'森林朋友':'初识的邻居'}</p><p class="dialogue-copy">「${C.dialogue(s,n.id)}」</p><p class="panel-copy">${esc(N.dialogue(s,n.id))}</p><p class="pill">好感 ${f.points} · 最喜欢${D.crops[n.likes].name}</p><p class="panel-copy">每天首次聊天 +1；交付这位邻居的订单 +2；每天可送一份喜欢的作物 +2。好感达到 3 收到纪念礼，达到 6 解锁新对话。</p>${button(`送一份${D.crops[n.likes].name}（拥有 ${s.inventory[n.likes]||0}）`,'gift',n.id,!(s.inventory[n.likes]>0)||f.lastGiftDay===C.day(s))}`;
         html += `<div class="btn-row">${button(s.story.activities[n.id]?'聚会心意已备好':'一起准备一份聚会心意','activity-open',n.id)}</div>`;
       } else if (openKind === 'activity') {
         title = D.activities[context.id].title; html = mini.render(context.id);
@@ -78,14 +79,14 @@
         html += next ? `<div class="order-card"><h3>${next.name}</h3><p class="panel-copy">${next.coins} 叶币 · ${Object.entries(next.costs).map(([k,n])=>`${D.materialNames[k]} ${s.materials[k]}/${n}`).join(' · ')}</p>${button('开始扩建', 'expand', '', s.coins < next.coins || !C.affordable(s,next.costs))}</div>` : '<p class="notice">家园已经全部开放。好好享受你亲手布置的小天地吧。</p>';
       } else if (openKind === 'home') {
         title = '灯亮着的地方就是家';
-        html = `<p class="panel-copy">今天也辛苦了。休息会迎来下一个清晨，森林材料会重新出现。作物依旧按现实时间慢慢成长。</p>${button('休息到明天', 'rest')}<div class="btn-row">${button('翻开手札', 'journal', '', false, true)}</div>`;
+        html = `<p class="panel-copy">今天${E.names[E.weather(s)]}，明天${E.names[E.weather(s,1)]}。休息会迎来下一个清晨，森林材料会重新出现。作物依旧按现实时间慢慢成长。</p>${button('休息到明天', 'rest')}<div class="btn-row">${button('翻开手札', 'journal', '', false, true)}</div>`;
       } else if (openKind === 'settings') {
         title = '把日子调成喜欢的样子';
         html = `<label class="setting-row">静音<input type="checkbox" data-setting="mute" ${s.settings.mute ? 'checked' : ''}></label><label class="setting-row">减少动态效果<input type="checkbox" data-setting="reducedMotion" ${s.settings.reducedMotion ? 'checked' : ''}></label><p class="panel-copy">存档保存在当前浏览器。换浏览器或设备前，请先导出备份。</p><div class="btn-row">${button('导出存档', 'export')}${button('导入存档', 'import', '', false, true)}${button('导出原始备份', 'raw', '', false, true)}</div><p class="panel-copy">WASD / 方向键移动，E 互动，B 背包，J 手札，Esc 关闭。点击地图会自动走近目标；手机也能用底部方向按钮。</p>${app.protected ? `<p class="notice">原始存档有问题，自动保存已暂停。可先导出原始备份，导入有效存档恢复；也可保留损坏备份后启用当前新进度。</p>${button('启用新存档，保留损坏备份','recover')}` : ''}`;
       } else if (openKind === 'journal') {
         title = '森林生活手札'; const q=C.quest(s);
         html = `<div class="order-card"><span class="eyebrow">${q.complete?'A STORY THAT GOES ON':'A LETTER FOR YOU'}</span><h3>${q.title}</h3><p class="panel-copy">${q.desc}</p><p class="panel-copy">${q.progress}</p>${q.reward?button(`领取来信 · ${q.reward} 叶币`,'claim','',!q.done):''}</div><h3 class="side-title" style="margin-top:24px">邻居通讯录</h3>`;
-        html += D.neighbors.map(n=>row(n.name+' · '+n.species,`${s.story.met.includes(n.id)?'已认识':'尚未见面'} · 好感 ${s.friends[n.id].points} · 喜欢${D.crops[n.likes].name}`,'',n.color)).join('');
+        html += D.neighbors.map(n=>{const location=N.whereabouts(s,n.id);return row(n.name+' · '+n.species,`${s.story.met.includes(n.id)?'已认识':'尚未见面'} · 好感 ${s.friends[n.id].points}<br>栗风小镇 · ${location.travelling?'正在前往':''}${location.name}`,button('去找'+n.name,'follow',n.id,false,true),n.color);}).join('');
         html += '<p class="panel-copy">小屋休息后，森林材料和聊天送礼次数会补充。作物按现实时间成长；可趁等待时探索、拜访和制作。地图点击可自动寻路，1/2/3 快速切换农具。</p>';
       } else if (openKind === 'festival') {
         title = s.story.festival ? '灯火亮起，我们都是家人' : '为森林留一张团聚的桌子';
@@ -116,6 +117,7 @@
       if (action === 'expand') app.perform(() => C.expand(s));
       if (action === 'rest') { app.perform(() => C.rest(s)); close(); }
       if (action === 'journal') open('journal');
+      if (action === 'follow') app.follow(id);
       if (action === 'activity-open') open('activity', { id });
       else if (action === 'activity-back') open('npc', { id });
       else if (action.startsWith('activity-')) mini.action(action,id);
@@ -134,7 +136,7 @@
     });
     content.addEventListener('change', e => { const id = e.target.dataset.setting; if (id) { app.state.settings[id] = e.target.checked; app.applySettings(); app.save(); } });
     $('#close-panel').addEventListener('click', close);
-    panel.addEventListener('close', () => { openKind = ''; app.stopWalking(); });
+    panel.addEventListener('close', () => { openKind = ''; app.canvas.focus({ preventScroll: true }); });
     $('#farm-tools').addEventListener('click', () => open('tools'));
     return { open, close, refresh, toast, tick() { if (panel.open && openKind === 'activity') mini.tick(); }, get isOpen() { return panel.open; } };
   }

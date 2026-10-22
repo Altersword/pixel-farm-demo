@@ -1,7 +1,7 @@
 /* Browser entry: coordinates the pure model, world, renderer and accessible UI. */
 (function () {
   'use strict';
-  const C = ForestCore, W = ForestWorld, D = ForestData;
+  const C = ForestCore, W = ForestWorld, D = ForestData, E = ForestEnvironment, N = ForestNeighbors;
   const canvas = document.querySelector('#world');
   let backend;
   try { backend = localStorage; } catch (_) { backend = { getItem: () => null, setItem: () => { throw new Error('浏览器存储不可用'); } }; }
@@ -9,6 +9,12 @@
   const audio = ForestAudio.create();
   const app = {
     state: loaded.state, protected: !!loaded.protected, canvas,
+    follow(id) {
+      const o = W.objects(W.maps[app.state.player.map], app.state).find(o => o.id === id);
+      if (!o) { ui.toast('先向东来到栗风小镇，再从通讯录找到朋友。'); return; }
+      ui.close(); app.stopWalking(); pending = o; route = W.pathTo(app.state, o.x, o.y, true) || [];
+      if (!route.length) { pending = null; interact(o); }
+    },
     stopWalking() { route = []; pending = null; held = ''; },
     save() {
       if (app.protected) return;
@@ -89,7 +95,7 @@
     try {
       if (file.size > 1000000) throw new Error('文件过大，请选择小于 1 MB 的存档');
       const next = storage.import(await file.text()); app.state = next; app.protected = false;
-      validatePosition(); app.stopWalking(); app.applySettings(); app.save(); ui.close(); ui.refresh(); ui.toast('存档导入成功，欢迎回家。');
+      validatePosition(); N.reset(app.state); E.irrigate(app.state); app.stopWalking(); app.applySettings(); app.save(); ui.close(); ui.refresh(); ui.toast('存档导入成功，欢迎回家。');
     } catch (error) { ui.toast('导入失败：' + error.message); }
     e.target.value = '';
   });
@@ -100,31 +106,33 @@
   function frame(time) {
     const dt = lastFrame ? Math.min(time - lastFrame, 100) : 0; lastFrame = time;
     if (!document.hidden && !ui.isOpen) {
-      app.state.world.elapsed += dt;
+      E.advance(app.state, dt);
+      N.update(app.state, dt);
       if (time - lastStep > 150) {
         lastStep = time;
         if (held) step(...dirs[held]);
-        else if (route.length) {
+        else {
           if (pending && pending.kind === 'npc') {
             const live = W.objects(W.maps[app.state.player.map], app.state).find(o => o.id === pending.id);
             if (!live) app.stopWalking();
             else { pending = live; route = W.pathTo(app.state, live.x, live.y, true) || []; }
           }
-          if (route.length) { const direction = route.shift(); if (!step(...direction)) app.stopWalking(); }
+          if (pending && W.near(app.state.player,pending)) { const target=pending; pending=null; route=[]; interact(target); }
+          else if (route.length) { const direction = route.shift(); if (!step(...direction)) app.stopWalking(); }
+          else if (pending) { app.stopWalking(); ui.toast('暂时找不到通行的小路，请换个位置再试。'); }
         }
-        else if (pending) { const target = pending; pending = null; interact(target); }
       }
     }
     if (time - lastGrowth > 1000) { C.grow(app.state); ui.refresh(); lastGrowth = time; }
     if (time - lastSave > 5000) { app.save(); lastSave = time; }
     art.draw(app.state, time);
     ui.tick();
-    audio.scene(app.state.player.map, app.state.world.elapsed % D.dayLength / D.dayLength > .75);
+    audio.scene(app.state.player.map, E.period(app.state) === 3, E.weather(app.state));
     requestAnimationFrame(frame);
   }
   document.addEventListener('visibilitychange', () => { lastFrame = 0; app.stopWalking(); app.save(); });
   window.addEventListener('pagehide', () => app.save());
-  validatePosition(); C.grow(app.state); app.applySettings(); ui.refresh(); app.save();
+  validatePosition(); C.grow(app.state); E.irrigate(app.state); app.applySettings(); ui.refresh(); app.save();
   if (loaded.error) ui.toast(loaded.error); else ui.toast('欢迎回家。向北是森林，向东是小镇。');
   if (!loaded.error && !app.state.settings.onboardingSeen) ui.open('welcome');
   requestAnimationFrame(frame);

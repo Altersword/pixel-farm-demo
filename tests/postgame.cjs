@@ -10,7 +10,7 @@ const profile=process.env.FOREST_PROFILE||path.resolve(root,'../normal-play-prof
  try{
   const url=pathToFileURL(path.join(root,'index.html')).href;await page.goto(url);assert.equal((await read(page)).story.stage,6);
   async function close(){if(await page.locator('#panel').evaluate(n=>n.open))await page.keyboard.press('Escape');}
-  async function go(id){await close();const o=await page.evaluate(id=>{const s=JSON.parse(localStorage.getItem('pixel_farm_save'));return ForestWorld.maps[s.player.map].objects.find(o=>o.id===id)},id);await walk(page,o.x,o.y,true);await clickTile(page,o.x,o.y);}
+  async function go(id){await close();const o=await page.evaluate(id=>{const s=JSON.parse(localStorage.getItem('pixel_farm_save'));return ForestWorld.objects(ForestWorld.maps[s.player.map],s).find(o=>o.id===id)},id);await walk(page,o.x,o.y,true);await clickTile(page,o.x,o.y);}
   let state=await read(page);
   if(state.player.map==='forest')await walk(page,14,18);
   if((await read(page)).player.map==='farm')await walk(page,26,9);

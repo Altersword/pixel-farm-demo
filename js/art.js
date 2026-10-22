@@ -53,7 +53,7 @@
       for (let y = 0; y < W.H; y++) for (let x = 0; x < W.W; x++) if (map.tiles[y][x] === 'tree') drawObjects.push({ kind: 'tree', x, y, w: 1, h: 1, sort: y + 1 });
       drawObjects.sort((a, b) => a.sort - b.sort);
       for (const o of drawObjects) {
-        const x = px(o.x), y = py(o.y), w = o.w * T, h = o.h * T;
+        const x = px(o.visualX === undefined ? o.x : o.visualX), y = py(o.visualY === undefined ? o.y : o.visualY), w = o.w * T, h = o.h * T;
         if (x + w < -T || x > width + T || y + h < -T || y > height + T) continue;
         if (o.kind === 'plot') {
           const i = Number(o.id.slice(5)), plot = s.plots[i];
@@ -95,8 +95,8 @@
           label(o.name, x + w / 2, y + h + 15);
         } else if (o.kind === 'player' || o.kind === 'npc') {
           const n = D.neighbors.find(n => n.id === o.id);
-          const stride = !s.settings.reducedMotion && o.kind === 'player' && time < strideUntil ? Math.floor(time / 90) % 2 : 0;
-          sprites.character(o.id || 'player', x, y, T, p.facing, stride);
+          const stride = !s.settings.reducedMotion && ((o.kind === 'player' && time < strideUntil) || o.moving) ? Math.floor(time / 90) % 2 : 0;
+          sprites.character(o.id || 'player', x, y, T, o.facing || p.facing, stride);
           if (n) label(n.name, x + T / 2, y - 7);
         } else if (o.kind === 'festival') {
           rect(x+3,y+10,w-6,23,'#ae8a5c');rect(x+5,y+12,w-10,16,'#eddbad');
@@ -112,6 +112,20 @@
       }
       for (const gate of map.portals) { const x = px(gate.x), y = py(gate.y); rect(x + 7, y + 5, T - 14, T - 10, '#e5dbb9'); label(gate.label, x + T / 2, y - 8); }
       if (darkness) { ctx.fillStyle = `rgba(30,48,77,${darkness})`; ctx.fillRect(0, 0, width, height); }
+      const weather = root.ForestEnvironment ? root.ForestEnvironment.weather(s) : 'sun';
+      if (weather === 'rain') {
+        ctx.fillStyle = '#526f8426'; ctx.fillRect(0,0,width,height);
+        if (!s.settings.reducedMotion) for(let i=0;i<65;i++){
+          const xx=(i*113+time*.025)%width, yy=(i*71+time*.24)%height;
+          rect(xx,yy,1,6,'#d4e2dd9c');
+        }
+      } else if(weather === 'mist') {
+        ctx.fillStyle = '#eceddf38';ctx.fillRect(0,0,width,height);
+        if(!s.settings.reducedMotion)for(let i=0;i<4;i++){
+          const xx=((time*.008+i*227)%(width+300))-200;
+          rect(xx,70+i*95,260,25,'#f1eddf24');
+        }
+      }
       if (phase > .75 && !s.settings.reducedMotion) {
         for (let i = 0; i < 14; i++) { const xx = (i * 193 + Math.sin(time / 2400 + i) * 18) % width, yy = (i * 97 + Math.cos(time / 2000 + i) * 9) % height; ctx.fillStyle = '#eedf9a'; ctx.globalAlpha = .4 + Math.sin(time / 900 + i) * .3; ctx.fillRect(xx, yy, 2, 2); }
         ctx.globalAlpha = 1;
