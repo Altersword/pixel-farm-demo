@@ -65,11 +65,11 @@ test('wrong weather records discovery without charging or rewarding',()=>{
  const s=C.newGame();X.discover(s,'paperboat');const before=JSON.stringify(s);assert.equal(X.complete(s,'paperboat').ok,false);assert.equal(JSON.stringify(s),before);
  for(const e of X.events){const p={...s,player:{map:e.map,x:14,y:9,facing:'down'}};assert.ok(W.pathTo(p,e.x,e.y,true));}
 });
-test('v2 upgrade preserves full progress, creates v3 and retains the original backup',()=>{
+test('v2 upgrade preserves full progress, creates v4 and retains the original backup',()=>{
  const s=C.newGame();s.version=2;delete s.exploration;s.coins=753;s.inventory.tomato=8;s.seeds.tomato=0;s.ordersCompleted=13;s.story.stage=6;s.story.festival=true;s.friends.rabbit.points=10;
  const data=new Map([['pixel_farm_save',JSON.stringify(s)]]),S=require('../js/storage.js'),store=S.create({getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v)});
- const m=store.load().state;assert.equal(m.version,3);for(const field of ['coins','inventory','seeds','plots','story','friends','ordersCompleted','player'])assert.deepEqual(m[field],s[field]);
- assert.equal(store.backup(),JSON.stringify(s));store.save(m);assert.equal(store.load().state.version,3);assert.equal(store.backup(),JSON.stringify(s));
+ const m=store.load().state;assert.equal(m.version,4);for(const field of ['coins','inventory','seeds','plots','story','friends','ordersCompleted','player'])assert.deepEqual(m[field],s[field]);
+ assert.equal(store.backup(),JSON.stringify(s));store.save(m);assert.equal(store.load().state.version,4);assert.equal(store.backup(),JSON.stringify(s));
 });
 test('malformed exploration imports leave the current save and backup untouched',()=>{
  const S=require('../js/storage.js'),data=new Map(),store=S.create({getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v)});store.save(C.newGame());const before=store.raw();

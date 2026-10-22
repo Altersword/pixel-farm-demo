@@ -48,9 +48,9 @@
   t.portals.push({ x: 14, y: 18, map: 'farm', toX: 14, toY: 2, label: '↓ 苔光农场' });
   // Every consumer resolves the same live objects; the base map stays immutable.
   function objects(map, state) {
-    return root.ForestNeighbors && state
-      ? [...map.objects.filter(o => o.kind !== 'npc'), ...root.ForestNeighbors.objects(state, map.id)]
-      : map.objects;
+    let result=root.ForestNeighbors&&state?[...map.objects.filter(o=>o.kind!=='npc'),...root.ForestNeighbors.objects(state,map.id)]:map.objects;
+    if(map.id==='home'&&state&&root.ForestHome)result=[...result,...root.ForestHome.furniture(state)];
+    return result;
   }
   function objectAt(map, x, y, state) { return objects(map, state).find(o => x >= o.x && x < o.x + o.w && y >= o.y && y < o.y + o.h); }
   function hitTest(map, x, y, state) {
@@ -59,9 +59,9 @@
       return x>=xx&&x<xx+o.w&&y>=yy&&y<yy+o.h;
     });
   }
-  function walkable(map, x, y) {
-    if (x < 1 || y < 1 || x >= W - 1 || y >= H - 1 || ['tree', 'water'].includes(map.tiles[y][x])) return false;
-    const o = objectAt(map, x, y);
+  function walkable(map, x, y, state) {
+    if (x < 1 || y < 1 || x >= W - 1 || y >= H - 1 || ['tree', 'water', 'wall', 'void'].includes(map.tiles[y][x])) return false;
+    const o = objectAt(map, x, y, state);
     return !o || ['plot', 'festival', 'decor', 'treasure', 'npc', 'exploration'].includes(o.kind);
   }
   function near(player, o) {
@@ -81,12 +81,13 @@
     const p = state.player;
     p.facing = dx < 0 ? 'left' : dx > 0 ? 'right' : dy < 0 ? 'up' : 'down';
     const map = maps[p.map], x = p.x + dx, y = p.y + dy;
-    if (!walkable(map, x, y)) return false;
+    if (!walkable(map, x, y, state)) return false;
     p.x = x; p.y = y;
     const portal = map.portals.find(o => o.x === x && o.y === y);
     if (portal) {
+      if(map.id==='home'&&root.ForestCore.endVisit)root.ForestCore.endVisit(state);
       Object.assign(p, { map: portal.map, x: portal.toX, y: portal.toY });
-      if (!state.world.visited.includes(p.map)) state.world.visited.push(p.map);
+      if (p.map!=='home'&&!state.world.visited.includes(p.map)) state.world.visited.push(p.map);
     }
     return true;
   }
@@ -99,7 +100,7 @@
       if (adjacent && obj ? near({ x: cx, y: cy }, obj) : cx === x && cy === y) return path;
       for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
         const nx = cx + dx, ny = cy + dy, key = nx + ',' + ny;
-        if (seen.has(key) || !walkable(map, nx, ny)) continue;
+        if (seen.has(key) || !walkable(map, nx, ny, state)) continue;
         seen.add(key); queue.push([nx, ny, [...path, [dx, dy]]]);
       }
     }

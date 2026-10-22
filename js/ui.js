@@ -31,6 +31,7 @@
       if (panel.open) render();
     }
     function open(kind, data = null) {
+      if(app.placement)app.cancelPlacement();
       openKind = kind; context = data; eventStep = 0; $('#panel-notice').hidden = true; app.stopWalking();
       if (kind === 'activity') mini.start(data.id);
       render();
@@ -80,13 +81,15 @@
         title = '让双手做一点喜欢的东西';
         html = `<p class="panel-copy">材料来自风铃森林。每日可重新采集，也可以回小屋休息迎接新的一天。</p><p class="pill">木材 ${s.materials.wood} · 石料 ${s.materials.stone}</p>`;
         html += Object.entries(D.recipes).map(([id, r]) => row(r.name, Object.entries(r.costs).map(([k,n]) => `${D.materialNames[k]} ${n}`).join(' · ') + ` · 已制作 ${s.crafted[id] || 0} 件`, button('制作', 'craft', id, !C.affordable(s,r.costs)))).join('');
+        html += '<h3 class="side-title">小屋家具</h3>';
+        html += Object.entries(D.homeRecipes).map(([id,r])=>row(r.name,Object.entries(r.costs).map(([k,n])=>`${D.materialNames[k]} ${n}`).join(' · '),button('制作','craft-home',id,!C.affordable(s,r.costs)))).join('');
       } else if (openKind === 'expand') {
         title = '把家园慢慢种大'; const next = D.expansions[s.expansion];
         html = `<p class="panel-copy">扩建等级 ${s.expansion} / 3 · 农田 ${s.plots.length} 块 · 装饰位 ${3+s.expansion*2} 个。每级新增 5 块农田和 2 个装饰位。</p>`;
         html += next ? `<div class="order-card"><h3>${next.name}</h3><p class="panel-copy">${next.coins} 叶币 · ${Object.entries(next.costs).map(([k,n])=>`${D.materialNames[k]} ${s.materials[k]}/${n}`).join(' · ')}</p>${button('开始扩建', 'expand', '', s.coins < next.coins || !C.affordable(s,next.costs))}</div>` : '<p class="notice">家园已经全部开放。好好享受你亲手布置的小天地吧。</p>';
       } else if (openKind === 'home') {
         title = '灯亮着的地方就是家';
-        html = `<p class="panel-copy">今天${E.names[E.weather(s)]}，明天${E.names[E.weather(s,1)]}。休息会迎来下一个清晨，森林材料会重新出现。作物依旧按现实时间慢慢成长。</p>${button('休息到明天', 'rest')}<div class="btn-row">${button('翻开手札', 'journal', '', false, true)}</div>`;
+        html = `<p class="panel-copy">今天${E.names[E.weather(s)]}，明天${E.names[E.weather(s,1)]}。休息会迎来下一个清晨，森林材料会重新出现。作物依旧按现实时间慢慢成长。</p>${s.player.map==='farm'?button('进入小屋','enter-home'):''}${button('休息到明天', 'rest')}<div class="btn-row">${button('翻开手札', 'journal', '', false, true)}</div>`;
       } else if (openKind === 'settings') {
         title = '把日子调成喜欢的样子';
         html = `<label class="setting-row">静音<input type="checkbox" data-setting="mute" ${s.settings.mute ? 'checked' : ''}></label><label class="setting-row">减少动态效果<input type="checkbox" data-setting="reducedMotion" ${s.settings.reducedMotion ? 'checked' : ''}></label><p class="panel-copy">存档保存在当前浏览器。换浏览器或设备前，请先导出备份。</p><div class="btn-row">${button('导出存档', 'export')}${button('导入存档', 'import', '', false, true)}${button('导出原始备份', 'raw', '', false, true)}</div><p class="panel-copy">WASD / 方向键移动，E 互动，B 背包，J 手札，Esc 关闭。点击地图会自动走近目标；手机也能用底部方向按钮。</p>${app.protected ? `<p class="notice">原始存档有问题，自动保存已暂停。可先导出原始备份，导入有效存档恢复；也可保留损坏备份后启用当前新进度。</p>${button('启用新存档，保留损坏备份','recover')}` : ''}`;
@@ -122,6 +125,8 @@
       if (action === 'gift') app.perform(() => C.gift(s,id));
       if (action === 'claim') app.perform(() => C.claimQuest(s));
       if (action === 'festival') app.perform(() => C.festival(s));
+      if (action === 'enter-home') { const result=app.perform(()=>C.enterHome(s));if(result.ok)close(); }
+      if (action === 'craft-home') app.perform(()=>C.craftHome(s,id));
       if (action === 'craft') app.perform(() => C.craft(s, id));
       if (action === 'expand') app.perform(() => C.expand(s));
       if (action === 'rest') { app.perform(() => C.rest(s)); close(); }
@@ -137,6 +142,7 @@
       if (action === 'welcome') { s.settings.onboardingSeen = true; app.save(); close(); }
       if (action === 'recover') app.recover();
       if (action === 'place') {
+        if(s.player.map==='home'){app.startPlacement(id);return;}
         if (s.player.map !== 'farm') { toast('回农场再布置吧。'); return; }
         const o = context && context.kind === 'decor' ? context : W.target(s);
         if (o && o.kind === 'decor' && W.near(s.player,o)) { app.perform(() => C.place(s, id, Number(o.id.slice(6)))); return; }

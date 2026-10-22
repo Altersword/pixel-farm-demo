@@ -10,6 +10,7 @@
           const parsed = JSON.parse(raw), state = root.ForestCore.migrate(parsed);
           if (!parsed.version) storage.setItem(key + '_legacy_backup', raw);
           if (parsed.version === 2 && !storage.getItem(key + '_version_2_backup')) storage.setItem(key + '_version_2_backup', raw);
+          if(parsed.version===3&&!storage.getItem(key+'_version_3_backup'))storage.setItem(key+'_version_3_backup',raw);
           return { state };
         } catch (error) {
           return { state: root.ForestCore.newGame(), error: `未能读取存档：${error.message}。原存档未覆盖，可导出原始备份。`, protected: true };
@@ -21,13 +22,14 @@
         if (typeof text !== 'string' || text.length > 1000000) throw new Error('存档文件过大');
         const parsed = JSON.parse(text), next = root.ForestCore.migrate(parsed);
         if (parsed.version === 2 && !storage.getItem(key + '_version_2_backup')) storage.setItem(key + '_version_2_backup', text);
+        if(parsed.version===3&&!storage.getItem(key+'_version_3_backup'))storage.setItem(key+'_version_3_backup',text);
         const old = storage.getItem(key);
         if (old) storage.setItem(key + '_import_backup', old);
         storage.setItem(key, JSON.stringify(next));
         return next;
       },
       raw() { return storage.getItem(key); },
-      backup() { return storage.getItem(key + '_damaged_backup') || storage.getItem(key + '_version_2_backup') || storage.getItem(key + '_legacy_backup') || storage.getItem(key + '_import_backup') || storage.getItem(key); },
+      backup() { return storage.getItem(key + '_damaged_backup') || storage.getItem(key + '_version_3_backup') || storage.getItem(key + '_version_2_backup') || storage.getItem(key + '_legacy_backup') || storage.getItem(key + '_import_backup') || storage.getItem(key); },
       recover() { const raw = storage.getItem(key); if (raw) storage.setItem(key + '_damaged_backup', raw); },
     };
   }

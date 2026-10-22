@@ -8,7 +8,7 @@
     let lastPlayer = null, strideUntil = 0, visual = null, motion = null, previousTime = 0;
     let view = { x: 0, y: 0, tile: 40, width: 800, height: 560 };
     const rect = (x, y, w, h, color) => { ctx.fillStyle = color; ctx.fillRect(Math.round(x), Math.round(y), Math.ceil(w), Math.ceil(h)); };
-    function draw(s, time) {
+    function draw(s, time, placement = null) {
       const width = canvas.clientWidth, height = canvas.clientHeight, ratio = Math.min(devicePixelRatio || 1, 2);
       if (canvas.width !== Math.round(width * ratio) || canvas.height !== Math.round(height * ratio)) { canvas.width = Math.round(width * ratio); canvas.height = Math.round(height * ratio); }
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0); ctx.imageSmoothingEnabled = false;
@@ -26,8 +26,8 @@
       lastPlayer = { x: p.x, y: p.y, map: p.map };
       const phase = s.world.elapsed % D.dayLength / D.dayLength;
       const darkness = phase < .55 ? 0 : phase < .75 ? (phase - .55) * 1.7 : .34;
-      const aimX = Math.max(0, Math.min(W.W * T - width, visual.x * T - width / 2));
-      const aimY = Math.max(0, Math.min(W.H * T - height, visual.y * T - height / 2));
+      const aimX = Math.max(0, Math.min(W.W * T - width, (placement?placement.x:visual.x) * T - width / 2));
+      const aimY = Math.max(0, Math.min(W.H * T - height, (placement?placement.y:visual.y) * T - height / 2));
       const snap = changedMap || s.settings.reducedMotion || width !== view.width || height !== view.height;
       const easing = snap ? 1 : 1 - Math.exp(-Math.min(100, Math.max(0, time - previousTime)) / 55);
       view = { x: view.x + (aimX - view.x) * easing, y: view.y + (aimY - view.y) * easing, tile: T, width, height };
@@ -35,8 +35,10 @@
       const px = x => x * T - view.x, py = y => y * T - view.y;
       for (let y = 0; y < W.H; y++) for (let x = 0; x < W.W; x++) {
         const type = map.tiles[y][x], hash = (x * 31 + y * 73) % 17, xx = px(x), yy = py(y);
-        const colors = { grass: hash % 3 ? '#8da975' : '#91ad79', path: hash % 2 ? '#d4c49b' : '#d8c9a4', soil: '#9f835e', water: '#78a8aa', tree: '#69895c' };
+        const colors = { void:'#514d3b',wall:'#b59270',floor:'#d6bc92',grass: hash % 3 ? '#8da975' : '#91ad79', path: hash % 2 ? '#d4c49b' : '#d8c9a4', soil: '#9f835e', water: '#78a8aa', tree: '#69895c' };
         rect(xx, yy, T + 1, T + 1, colors[type]);
+        if(type==='floor'){rect(xx,yy+T-2,T,2,'#b99c75');rect(xx+(y%2?0:T/2),yy,1,T,'#c1a77f');if(hash<4)rect(xx+9,yy+15,14,1,'#c3a67b');}
+        if(type==='wall'){rect(xx,yy+T-5,T,5,'#8d6f51');rect(xx,yy+8,T,2,'#c9ae87');}
         if (type === 'grass' && hash < 5) { rect(xx + 8, yy + 18, 2, 4, '#759962'); rect(xx + 11, yy + 16, 2, 6, '#a7bc85'); }
         if (type === 'grass' && (x * 17 + y * 13) % 29 === 1) { rect(xx + 17, yy + 21, 2, 5, '#6f8b50'); rect(xx + 15, yy + 19, 6, 3, '#e3c47f'); rect(xx + 17, yy + 17, 2, 6, '#eddfac'); }
         if (type === 'water') { rect(xx + 6, yy + 10, T / 3, 2, '#a3c7c0'); rect(xx + 18, yy + 28, T / 4, 2, '#8db9b8'); }
@@ -55,7 +57,11 @@
       for (const o of drawObjects) {
         const x = px(o.visualX === undefined ? o.x : o.visualX), y = py(o.visualY === undefined ? o.y : o.visualY), w = o.w * T, h = o.h * T;
         if (x + w < -T || x > width + T || y + h < -T || y > height + T) continue;
-        if (o.kind === 'plot') {
+        if(s.player.map==='home'&&['bed','stove','bag','dining','seat','room-decor'].includes(o.kind)){
+          const sprite=o.kind==='room-decor'?D.items[o.item].sprite:{bed:'bed',stove:'stove',bag:'bookshelf',dining:'low_table',seat:'wood_chair'}[o.kind];
+          ctx.save();ctx.translate(x,y);ctx.scale(o.w,o.h);sprites.furniture(sprite,0,0,T);ctx.restore();
+          if(target&&target.id===o.id)label(o.name,x+w/2,y-5);
+        } else if (o.kind === 'plot') {
           const i = Number(o.id.slice(5)), plot = s.plots[i];
           if (!plot) { rect(x + 3, y + 3, T - 6, T - 6, '#9e976c'); continue; }
           rect(x + 2, y + 3, T - 4, T - 5, plot.watered ? '#796348' : '#94704d');
@@ -118,8 +124,12 @@
         if (target && target.id === o.id) { ctx.strokeStyle = '#fff0bb'; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, w - 2, h - 2); }
       }
       for (const gate of map.portals) { const x = px(gate.x), y = py(gate.y); rect(x + 7, y + 5, T - 14, T - 10, '#e5dbb9'); label(gate.label, x + T / 2, y - 8); }
-      if (darkness) { ctx.fillStyle = `rgba(30,48,77,${darkness})`; ctx.fillRect(0, 0, width, height); }
-      const weather = root.ForestEnvironment ? root.ForestEnvironment.weather(s) : 'sun';
+      if(map.id==='home'){
+        for(const wx of [10,17]){const xx=px(wx),yy=py(4);rect(xx,yy-12,T*2,36,'#795f48');rect(xx+4,yy-8,T*2-8,28,phase>.75?'#6c8090':'#b7d0c0');rect(xx+T-2,yy-8,4,28,'#e6d1a5');rect(xx+4,yy+6,T*2-8,3,'#e6d1a5');}
+        rect(px(12),py(8),T*2,T*3,'#c6977c55');
+      }
+      if (darkness && map.id!=='home') { ctx.fillStyle = `rgba(30,48,77,${darkness})`; ctx.fillRect(0, 0, width, height); }
+      const weather = map.id==='home'?'indoor':root.ForestEnvironment ? root.ForestEnvironment.weather(s) : 'sun';
       if (weather === 'rain') {
         ctx.fillStyle = '#526f8426'; ctx.fillRect(0,0,width,height);
         if (!s.settings.reducedMotion) for(let i=0;i<65;i++){
@@ -133,9 +143,14 @@
           rect(xx,70+i*95,260,25,'#f1eddf24');
         }
       }
-      if (phase > .75 && !s.settings.reducedMotion) {
+      if (phase > .75 && map.id!=='home' && !s.settings.reducedMotion) {
         for (let i = 0; i < 14; i++) { const xx = (i * 193 + Math.sin(time / 2400 + i) * 18) % width, yy = (i * 97 + Math.cos(time / 2000 + i) * 9) % height; ctx.fillStyle = '#eedf9a'; ctx.globalAlpha = .4 + Math.sin(time / 900 + i) * .3; ctx.fillRect(xx, yy, 2, 2); }
         ctx.globalAlpha = 1;
+      }
+      if(placement){
+        const ok=root.ForestHome.canPlace(s,placement.item,placement.x,placement.y).ok;
+        ctx.globalAlpha=.65;sprites.furniture(D.items[placement.item].sprite,px(placement.x),py(placement.y),T);ctx.globalAlpha=1;
+        ctx.strokeStyle=ok?'#4c8056':'#b75f50';ctx.lineWidth=3;ctx.strokeRect(px(placement.x)+1,py(placement.y)+1,T-2,T-2);
       }
       function label(text, x, y) { ctx.font = '11px "Microsoft YaHei", sans-serif'; ctx.textAlign = 'center'; const w = ctx.measureText(text).width; rect(x - w / 2 - 5, y - 11, w + 10, 16, '#f8efd9c9'); ctx.fillStyle = '#344f3e'; ctx.fillText(text, x, y); }
     }

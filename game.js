@@ -15,6 +15,9 @@
       ui.close(); app.stopWalking(); pending = o; route = W.pathTo(app.state, o.x, o.y, true) || [];
       if (!route.length) { pending = null; interact(o); }
     },
+    placement: null,
+    startPlacement(id) { ui.close();app.stopWalking();app.placement={item:id,x:app.state.player.x,y:app.state.player.y-1};showPlacement(); },
+    cancelPlacement() { app.placement=null;document.querySelector('#placement-bar').hidden=true;app.stopWalking();ui.refresh(); },
     stopWalking() { route = []; pending = null; held = ''; },
     save() {
       if (app.protected) return;
@@ -34,7 +37,21 @@
   let route = [], pending = null, held = '', lastStep = 0, lastFrame = 0, lastGrowth = 0, lastSave = 0;
   const art = ForestArt.create(canvas), ui = ForestUI.create(app);
   const dirs = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+  function showPlacement() {
+    const p=app.placement;if(!p)return;
+    const result=ForestHome.canPlace(app.state,p.item,p.x,p.y);
+    document.querySelector('#placement-bar').hidden=false;
+    document.querySelector('#placement-label').textContent=D.items[p.item].name+' · '+result.message;
+    document.querySelector('#place-confirm').disabled=!result.ok;
+  }
+  function confirmPlacement() {
+    const p=app.placement;if(!p)return;
+    if(app.perform(()=>C.placeHome(app.state,p.item,p.x,p.y)).ok)app.cancelPlacement();else showPlacement();
+  }
+  document.querySelector('#place-confirm').addEventListener('click',confirmPlacement);
+  document.querySelector('#place-cancel').addEventListener('click',()=>app.cancelPlacement());
   function interact(object = W.target(app.state)) {
+    if(app.placement){confirmPlacement();return;}
     if (object) object = W.objects(W.maps[app.state.player.map], app.state).find(o => o.id === object.id);
     if (!object || !W.near(app.state.player, object)) { ui.toast('走近一点，就能和这里的生活打招呼。'); return; }
     app.stopWalking();
@@ -50,6 +67,8 @@
       else ui.open('bag', object);
       return;
     }
+    if (object.kind === 'room-decor') { app.perform(()=>C.retrieveHome(app.state,object.x,object.y));return; }
+    if (object.kind === 'bed') { ui.open('home');return; }
     if (object.kind === 'sign') { ui.toast(object.name); return; }
     if (object.kind === 'npc') app.perform(() => C.talk(app.state, object.id));
     ui.open({ home: 'home', bag: 'bag', shop: 'shop', orders: 'orders', npc: 'npc' }[object.kind] || object.kind, object);
@@ -66,6 +85,7 @@
   canvas.addEventListener('click', event => {
     if (ui.isOpen) return;
     canvas.focus({ preventScroll: true });
+    if(app.placement){const pos=art.tileAt(event.clientX,event.clientY);app.placement.x=pos.x;app.placement.y=pos.y;showPlacement();return;}
     const pos = art.pointAt(event.clientX, event.clientY), map = W.maps[app.state.player.map];
     const object = W.hitTest(map, pos.x, pos.y, app.state);
     const next = W.pathTo(app.state, object?object.x:Math.floor(pos.x), object?object.y:Math.floor(pos.y), !!object);
@@ -75,11 +95,12 @@
   });
   const keys = { ArrowUp: 'up', w: 'up', W: 'up', ArrowDown: 'down', s: 'down', S: 'down', ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right' };
   document.addEventListener('keydown', e => {
+    if(app.placement&&e.key==='Escape'){e.preventDefault();app.cancelPlacement();return;}
     if (ui.isOpen || e.ctrlKey || e.metaKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
     if (keys[e.key]) { e.preventDefault(); route = []; pending = null; held = keys[e.key]; }
     if (!e.repeat && e.key.toLowerCase() === 'e') { e.preventDefault(); interact(); }
-    if (!e.repeat && e.key.toLowerCase() === 'b') ui.open('bag');
-    if (!e.repeat && e.key.toLowerCase() === 'j') ui.open('journal');
+    if (!app.placement && !e.repeat && e.key.toLowerCase() === 'b') ui.open('bag');
+    if (!app.placement && !e.repeat && e.key.toLowerCase() === 'j') ui.open('journal');
     if (!e.repeat && ['1', '2', '3'].includes(e.key)) { app.state.tool = ['plant', 'water', 'harvest'][Number(e.key) - 1]; app.save(); ui.refresh(); }
   });
   document.addEventListener('keyup', e => { if (keys[e.key] === held) held = ''; });
@@ -96,13 +117,13 @@
     try {
       if (file.size > 1000000) throw new Error('文件过大，请选择小于 1 MB 的存档');
       const next = storage.import(await file.text()); app.state = next; app.protected = false;
-      validatePosition(); N.reset(app.state); E.irrigate(app.state); app.stopWalking(); app.applySettings(); app.save(); ui.close(); ui.refresh(); ui.toast('存档导入成功，欢迎回家。');
+      app.cancelPlacement();validatePosition(); N.reset(app.state); E.irrigate(app.state); app.stopWalking(); app.applySettings(); app.save(); ui.close(); ui.refresh(); ui.toast('存档导入成功，欢迎回家。');
     } catch (error) { ui.toast('导入失败：' + error.message); }
     e.target.value = '';
   });
   function validatePosition() {
     const p = app.state.player;
-    if (!W.walkable(W.maps[p.map], p.x, p.y)) Object.assign(p, { map: 'farm', x: 14, y: 8 });
+    if (!W.walkable(W.maps[p.map], p.x, p.y, app.state)) Object.assign(p, { map: 'farm', x: 14, y: 8 });
   }
   function frame(time) {
     const dt = lastFrame ? Math.min(time - lastFrame, 100) : 0; lastFrame = time;
@@ -111,7 +132,8 @@
       N.update(app.state, dt);
       if (time - lastStep > 150) {
         lastStep = time;
-        if (held) step(...dirs[held]);
+        if (held && app.placement) { const [dx,dy]=dirs[held];app.placement.x=Math.max(7,Math.min(20,app.placement.x+dx));app.placement.y=Math.max(5,Math.min(14,app.placement.y+dy));showPlacement(); }
+        else if (held) step(...dirs[held]);
         else {
           if (pending && pending.kind === 'npc') {
             const live = W.objects(W.maps[app.state.player.map], app.state).find(o => o.id === pending.id);
@@ -126,7 +148,7 @@
     }
     if (time - lastGrowth > 1000) { C.grow(app.state); ui.refresh(); lastGrowth = time; }
     if (time - lastSave > 5000) { app.save(); lastSave = time; }
-    art.draw(app.state, time);
+    art.draw(app.state, time, app.placement);
     ui.tick();
     audio.scene(app.state.player.map, E.period(app.state) === 3, E.weather(app.state));
     requestAnimationFrame(frame);
